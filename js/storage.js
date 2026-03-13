@@ -268,4 +268,8 @@ const Storage = {
     const updated = [newVisit, ...filtered].slice(0, 10);
     this.saveRecent(updated);
   },
+
+  clearRecent() {
+    localStorage.removeItem(this.RECENT_KEY);
+  },
 };

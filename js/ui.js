@@ -99,7 +99,7 @@ const UI = {
 
       col.forEach(section => {
         if (section.type === 'recent') {
-          colEl.appendChild(this._makeRecentSection(section.items, onStar));
+          colEl.appendChild(this._makeRecentSection(section.items, onStar, onDelete));
         } else if (section.type === 'starred') {
           colEl.appendChild(this._makeStarredSection(section.items, onDelete, onStar));
         } else if (section.type === 'tag') {
@@ -113,13 +113,21 @@ const UI = {
     container.appendChild(masonryContainer);
   },
 
-  _makeRecentSection(items, onStar) {
+  _makeRecentSection(items, onStar, onClearRecent) {
     const section = document.createElement('div');
     section.className = 'group-section';
 
     const header = document.createElement('div');
     header.className = 'group-header';
-    header.innerHTML = '<span class="group-name">RECENT</span>';
+    header.innerHTML = `
+      <span class="group-name">RECENT</span>
+      <button class="recent-clear-btn" title="Clear recent history">CLEAR</button>
+    `;
+    header.querySelector('.recent-clear-btn').onclick = (e) => {
+      e.stopPropagation();
+      Storage.clearRecent();
+      if (onClearRecent) onClearRecent();
+    };
     section.appendChild(header);
 
     const list = document.createElement('div');
@@ -179,9 +187,16 @@ const UI = {
     a.href = bookmark.url;
     a.className = 'bookmark';
 
+    // SVG kebab (three vertical dots) icon
+    const menuSVG = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="7" cy="2" r="1.4"/>
+      <circle cx="7" cy="7" r="1.4"/>
+      <circle cx="7" cy="12" r="1.4"/>
+    </svg>`;
+
     a.innerHTML = `
       <span class="bookmark-label">${bookmark.title}</span>
-      <button class="bookmark-menu" title="Options">…</button>
+      <button class="bookmark-menu" title="Options">${menuSVG}</button>
     `;
 
     a.querySelector('.bookmark-menu').onclick = (e) => {
