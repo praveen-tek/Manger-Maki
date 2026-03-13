@@ -1,3 +1,12 @@
+:root {
+  --bookmark-font-size: 13px;
+  --bookmark-color: #ffffff;
+  --bookmark-weight: bold;
+  --bookmark-spacing: 0.2px;
+  --column-count: 4;
+  --bookmark-padding: 7px;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -139,16 +148,36 @@ body {
 /* ── BOOKMARKS GRID ── */
 .bookmarks-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(var(--column-count), 1fr);
   gap: 0;
   width: 100%;
+}
+
+/* ── MASONRY LAYOUT ── */
+.masonry-container {
+  display: grid;
+  grid-template-columns: repeat(var(--column-count), 1fr);
+  gap: 24px;
+  width: 100%;
+}
+
+.masonry-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.bookmark-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .bookmark {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px 7px 0;
+  padding: var(--bookmark-padding) 10px var(--bookmark-padding) 0;
   cursor: pointer;
   text-decoration: none;
   color: #fff;
@@ -164,15 +193,13 @@ body {
   opacity: 0.6;
 }
 
-
-
 .bookmark-label {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--bookmark-font-size);
+  font-weight: var(--bookmark-weight);
   font-family: 'Courier New', monospace;
-  letter-spacing: 0.2px;
+  letter-spacing: var(--bookmark-spacing);
   text-transform: uppercase;
-  color: #fff;
+  color: var(--bookmark-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -180,7 +207,19 @@ body {
   min-width: 0;
 }
 
-.bookmark-delete {
+.bookmark-star {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  cursor: pointer;
+  transition: color 0.15s ease;
+  padding: 0 4px;
+}
+
+.bookmark:hover .bookmark-star {
+  color: rgba(255,215,0,0.8);
+}
+
+.bookmark-menu {
   position: absolute;
   right: 0;
   top: 50%;
@@ -189,22 +228,59 @@ body {
   height: 18px;
   background: none;
   border: none;
-  color: rgba(255,59,48,0.7);
-  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  font-size: 14px;
   cursor: pointer;
   display: none;
   align-items: center;
   justify-content: center;
   z-index: 20;
   padding: 0;
+  transition: color 0.15s ease;
 }
 
-.bookmark:hover .bookmark-delete {
+.bookmark:hover .bookmark-menu {
   display: flex;
 }
 
-.bookmark-delete:hover {
-  color: #ff3b30;
+.bookmark-menu:hover {
+  color: rgba(255,255,255,0.7);
+}
+
+/* ── CONTEXT MENU ── */
+.bookmark-context-menu {
+  background: #0d0d0d;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 0;
+  min-width: 120px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 2000;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.context-menu-item:last-child {
+  border-bottom: none;
+}
+
+.context-menu-item:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
 }
 
 /* ── GROUPS ── */
@@ -712,12 +788,213 @@ body {
 
 @media (max-width: 1024px) {
   .bookmarks-grid { grid-template-columns: repeat(3, 1fr); }
+  .masonry-container { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 768px) {
   .header { padding: 16px 20px 12px; flex-direction: column; }
   .main { padding: 8px 20px 20px; }
   .bookmarks-grid { grid-template-columns: repeat(2, 1fr); }
+  .masonry-container { grid-template-columns: repeat(2, 1fr); }
   .wallpaper-options { grid-template-columns: 1fr; }
   .tag-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── CUSTOMIZE PANEL ── */
+.cust-sub-label {
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.25);
+  margin-bottom: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.cust-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.cust-label {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cust-val {
+  color: rgba(255,255,255,0.75);
+  font-weight: normal;
+}
+
+/* Range sliders */
+.cust-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: rgba(255,255,255,0.12);
+  outline: none;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.cust-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: rgba(255,255,255,0.85);
+  cursor: pointer;
+  border-radius: 0;
+  border: none;
+  transition: background 0.15s;
+}
+
+.cust-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: rgba(255,255,255,0.85);
+  cursor: pointer;
+  border-radius: 0;
+  border: none;
+}
+
+.cust-slider::-webkit-slider-thumb:hover {
+  background: #fff;
+}
+
+/* Color picker + swatches */
+.cust-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cust-color-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 0;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cust-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.cust-color-input::-webkit-color-swatch { border: none; border-radius: 0; }
+
+.cust-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 0;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.cust-swatch:hover {
+  border-color: rgba(255,255,255,0.5);
+  transform: scale(1.15);
+}
+
+.cust-swatch.active {
+  border-color: #fff;
+  outline: 1px solid rgba(255,255,255,0.6);
+  outline-offset: 1px;
+}
+
+/* Toggle button groups */
+.cust-toggle-group {
+  display: flex;
+  gap: 0;
+}
+
+.cust-toggle-btn {
+  padding: 5px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0;
+  color: rgba(255,255,255,0.45);
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-right: -1px;
+}
+
+.cust-toggle-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+}
+
+.cust-toggle-btn.active {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(255,255,255,0.35);
+  color: #fff;
+  position: relative;
+  z-index: 1;
+}
+
+/* Tag pills */
+.cust-tag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  min-height: 28px;
+}
+
+.cust-tag-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 0;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.7);
+}
+
+.cust-tag-pill-del {
+  background: none;
+  border: none;
+  color: rgba(255,59,48,0.55);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.cust-tag-pill-del:hover { color: #ff3b30; }
+
+.cust-add-tag-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }

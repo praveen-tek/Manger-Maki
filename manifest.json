@@ -14,9 +14,15 @@
   },
   "permissions": [
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "action": {
-    "default_title": "Manger-Maki Settings"
+    "default_title": "Manger-Maki — Add Bookmark",
+    "default_popup": "popup/popup.html"
   }
 }

@@ -10,29 +10,63 @@ const UI = {
     });
   },
 
-  renderBookmarks(container, bookmarks, onDelete) {
+  renderBookmarks(container, bookmarks, onDelete, onStar) {
     container.innerHTML = '';
     if (!bookmarks.length) return;
 
     const activeTag = window._currentFilter;
 
+    // Single tag filter - show in 4-column grid without headers
     if (activeTag && activeTag !== 'All') {
-      const section = document.createElement('div');
-      section.className = 'group-section';
-      const header = document.createElement('div');
-      header.className = 'group-header';
-      header.innerHTML = `<span class="group-name">${activeTag}</span>`;
-      section.appendChild(header);
-      section.appendChild(this._makeGrid(bookmarks, onDelete));
-      container.appendChild(section);
+      const grid = document.createElement('div');
+      grid.className = 'bookmarks-grid';
+      bookmarks.forEach(bookmark => {
+        grid.appendChild(this._makeBookmarkElement(bookmark, onDelete, onStar));
+      });
+      container.appendChild(grid);
       return;
     }
 
+    // Masonry layout for "All" view
+    this._renderMasonry(container, bookmarks, onDelete, onStar);
+  },
+
+  _renderMasonry(container, bookmarks, onDelete, onStar) {
+    const masonryContainer = document.createElement('div');
+    masonryContainer.className = 'masonry-container';
+
+    // Initialize 4 columns
+    const columns = [[], [], [], []];
+    let columnHeights = [0, 0, 0, 0];
+
+    // Get starred bookmarks
+    const starred = Storage.getStarred();
+    const recent = Storage.getRecent();
+
+    // Add RECENT section to column 0 if exists
+    if (recent.length > 0) {
+      const recentHeight = 24 + (recent.length * 18) + 8; // header + items + gap
+      columns[0].push({ type: 'recent', items: recent });
+      columnHeights[0] += recentHeight;
+    }
+
+    // Add STARRED section to column 0 if exists
+    const starredBookmarks = bookmarks.filter(b => starred.includes(b.id));
+    if (starredBookmarks.length > 0) {
+      const starredHeight = 24 + (starredBookmarks.length * 18) + 8;
+      columns[0].push({ type: 'starred', items: starredBookmarks });
+      columnHeights[0] += starredHeight;
+    }
+
+    // Group remaining bookmarks by tag
     const tagOrder = Bookmarks.getTags();
     const seen = new Set();
     const byTag = {};
 
     bookmarks.forEach(b => {
+      // Skip if already in starred
+      if (starred.includes(b.id)) return;
+
       const tags = b.tags && b.tags.length ? b.tags : ['_none'];
       tags.forEach(t => {
         if (!byTag[t]) byTag[t] = [];
@@ -46,46 +80,174 @@ const UI = {
     const orderedTags = tagOrder.filter(t => byTag[t] && byTag[t].length);
     if (byTag['_none'] && byTag['_none'].length) orderedTags.push('_none');
 
+    // Distribute tag groups greedily to shortest column
     orderedTags.forEach(tag => {
       const items = byTag[tag];
       if (!items || !items.length) return;
 
-      const section = document.createElement('div');
-      section.className = 'group-section';
-
-      const header = document.createElement('div');
-      header.className = 'group-header';
-      header.innerHTML = `<span class="group-name">${tag === '_none' ? 'other' : tag}</span>`;
-      section.appendChild(header);
-      section.appendChild(this._makeGrid(items, onDelete));
-      container.appendChild(section);
+      const groupHeight = 24 + (items.length * 18) + 8; // header + items + gap
+      const shortestIdx = columnHeights.indexOf(Math.min(...columnHeights));
+      
+      columns[shortestIdx].push({ type: 'tag', tag, items });
+      columnHeights[shortestIdx] += groupHeight;
     });
+
+    // Render columns
+    columns.forEach((col, idx) => {
+      const colEl = document.createElement('div');
+      colEl.className = 'masonry-column';
+
+      col.forEach(section => {
+        if (section.type === 'recent') {
+          colEl.appendChild(this._makeRecentSection(section.items, onStar));
+        } else if (section.type === 'starred') {
+          colEl.appendChild(this._makeStarredSection(section.items, onDelete, onStar));
+        } else if (section.type === 'tag') {
+          colEl.appendChild(this._makeTagSection(section.tag, section.items, onDelete, onStar));
+        }
+      });
+
+      masonryContainer.appendChild(colEl);
+    });
+
+    container.appendChild(masonryContainer);
   },
 
-  _makeGrid(bookmarks, onDelete) {
-    const grid = document.createElement('div');
-    grid.className = 'bookmarks-grid';
+  _makeRecentSection(items, onStar) {
+    const section = document.createElement('div');
+    section.className = 'group-section';
 
-    bookmarks.forEach(bookmark => {
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = '<span class="group-name">RECENT</span>';
+    section.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'bookmark-list';
+    items.forEach(item => {
       const a = document.createElement('a');
-      a.href = bookmark.url;
+      a.href = item.url;
       a.className = 'bookmark';
-
-      a.innerHTML = `
-        <span class="bookmark-label">${bookmark.title}</span>
-        <button class="bookmark-delete" title="Delete">✕</button>
-      `;
-
-      a.querySelector('.bookmark-delete').onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (confirm(`Delete "${bookmark.title}"?`)) onDelete(bookmark.id);
-      };
-
-      grid.appendChild(a);
+      a.innerHTML = `<span class="bookmark-label">${item.title}</span>`;
+      list.appendChild(a);
     });
+    section.appendChild(list);
 
-    return grid;
+    return section;
+  },
+
+  _makeStarredSection(items, onDelete, onStar) {
+    const section = document.createElement('div');
+    section.className = 'group-section';
+
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = '<span class="group-name">STARRED</span>';
+    section.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'bookmark-list';
+    items.forEach(bookmark => {
+      list.appendChild(this._makeBookmarkElement(bookmark, onDelete, onStar, true));
+    });
+    section.appendChild(list);
+
+    return section;
+  },
+
+  _makeTagSection(tag, items, onDelete, onStar) {
+    const section = document.createElement('div');
+    section.className = 'group-section';
+
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = `<span class="group-name">${tag === '_none' ? 'OTHER' : tag}</span>`;
+    section.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'bookmark-list';
+    items.forEach(bookmark => {
+      list.appendChild(this._makeBookmarkElement(bookmark, onDelete, onStar));
+    });
+    section.appendChild(list);
+
+    return section;
+  },
+
+  _makeBookmarkElement(bookmark, onDelete, onStar, isStarred = false) {
+    const a = document.createElement('a');
+    a.href = bookmark.url;
+    a.className = 'bookmark';
+
+    a.innerHTML = `
+      <span class="bookmark-label">${bookmark.title}</span>
+      <button class="bookmark-menu" title="Options">…</button>
+    `;
+
+    a.querySelector('.bookmark-menu').onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this._showBookmarkMenu(e, bookmark, onDelete, onStar);
+    };
+
+    // Track visit on click
+    a.onclick = (e) => {
+      Storage.addVisit(bookmark.url, bookmark.title);
+    };
+
+    return a;
+  },
+
+  _showBookmarkMenu(event, bookmark, onDelete, onStar) {
+    // Close any existing menu
+    const existing = document.querySelector('.bookmark-context-menu');
+    if (existing) existing.remove();
+
+    const isStarred = Storage.isStarred(bookmark.id);
+    const menu = document.createElement('div');
+    menu.className = 'bookmark-context-menu';
+
+    const starItem = document.createElement('button');
+    starItem.className = 'context-menu-item';
+    starItem.textContent = isStarred ? '✩ UNSTAR' : '★ STAR';
+    starItem.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      Storage.toggleStar(bookmark.id);
+      onStar();
+      menu.remove();
+    };
+
+    const deleteItem = document.createElement('button');
+    deleteItem.className = 'context-menu-item';
+    deleteItem.textContent = '✕ REMOVE';
+    deleteItem.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (confirm(`Delete "${bookmark.title}"?`)) onDelete(bookmark.id);
+      menu.remove();
+    };
+
+    menu.appendChild(starItem);
+    menu.appendChild(deleteItem);
+
+    // Position near cursor
+    const rect = event.target.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.left = (rect.right - 80) + 'px';
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.zIndex = '2000';
+
+    document.body.appendChild(menu);
+
+    // Close on outside click
+    const closeMenu = (e) => {
+      if (!menu.contains(e.target) && e.target !== event.target) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+    document.addEventListener('click', closeMenu);
   },
 
   renderTagOptions(container, selectedTags, onTagChange) {

@@ -109,6 +109,75 @@
           <div id="settingsBookmarksList"></div>
         </div>
 
+        <!-- CUSTOMIZE SECTION -->
+        <div class="settings-section">
+          <h3>Customize</h3>
+
+          <!-- Typography -->
+          <div class="cust-sub-label">TYPOGRAPHY</div>
+
+          <div class="cust-row">
+            <label class="cust-label" for="custFontSize">FONT SIZE <span class="cust-val" id="custFontSizeVal">13px</span></label>
+            <input type="range" class="cust-slider" id="custFontSize" min="10" max="18" step="1" value="13">
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">FONT COLOR</label>
+            <div class="cust-color-row">
+              <input type="color" class="cust-color-input" id="custFontColor" value="#ffffff">
+              <button class="cust-swatch" data-color="#ffffff" style="background:#ffffff;" title="#ffffff"></button>
+              <button class="cust-swatch" data-color="#f5f0e8" style="background:#f5f0e8;" title="Warm white"></button>
+              <button class="cust-swatch" data-color="rgba(255,255,255,0.6)" style="background:rgba(255,255,255,0.6);" title="Muted"></button>
+              <button class="cust-swatch" data-color="#f5c842" style="background:#f5c842;" title="Amber"></button>
+              <button class="cust-swatch" data-color="#a8c5a0" style="background:#a8c5a0;" title="Soft green"></button>
+              <button class="cust-swatch" data-color="#e8a0a0" style="background:#e8a0a0;" title="Soft red"></button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">FONT WEIGHT</label>
+            <div class="cust-toggle-group" id="custFontWeight">
+              <button class="cust-toggle-btn" data-val="normal" id="custWeightRegular">REGULAR</button>
+              <button class="cust-toggle-btn active" data-val="bold" id="custWeightBold">BOLD</button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label" for="custSpacing">LETTER SPACING <span class="cust-val" id="custSpacingVal">0.2px</span></label>
+            <input type="range" class="cust-slider" id="custSpacing" min="0" max="3" step="0.1" value="0.2">
+          </div>
+
+          <!-- Tags -->
+          <div class="cust-sub-label" style="margin-top:18px;">TAGS</div>
+          <div class="cust-tag-pills" id="custTagPills"></div>
+          <div class="cust-add-tag-row">
+            <input type="text" class="form-input" id="custNewTagInput" placeholder="New tag name" maxlength="20" style="flex:1;font-size:11px;padding:7px 10px;">
+            <button class="btn btn-secondary" id="custAddTagBtn">Add</button>
+          </div>
+          <div class="form-error" id="custTagError"></div>
+
+          <!-- Layout -->
+          <div class="cust-sub-label" style="margin-top:18px;">LAYOUT</div>
+
+          <div class="cust-row">
+            <label class="cust-label">COLUMNS</label>
+            <div class="cust-toggle-group" id="custColumns">
+              <button class="cust-toggle-btn" data-val="2">2</button>
+              <button class="cust-toggle-btn" data-val="3">3</button>
+              <button class="cust-toggle-btn active" data-val="4">4</button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">COMPACT MODE</label>
+            <div class="cust-toggle-group" id="custCompact">
+              <button class="cust-toggle-btn active" data-val="false">OFF</button>
+              <button class="cust-toggle-btn" data-val="true">ON</button>
+            </div>
+          </div>
+
+        </div>
+
         <div class="settings-section">
           <h3>Data</h3>
           <div class="data-controls">

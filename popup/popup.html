@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manger-Maki</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 320px;
+      height: 420px;
+      background: #000;
+      color: #fff;
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      font-size: 13px;
+      overflow: hidden;
+    }
+
+    .popup {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 18px;
+      gap: 14px;
+    }
+
+    /* Header */
+    .popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+
+    .popup-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .popup-mark {
+      font-size: 10px;
+      color: rgba(255,255,255,0.2);
+      letter-spacing: 1px;
+    }
+
+    /* Form fields */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .field-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 0;
+      color: #fff;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+
+    .field-input:focus {
+      border-color: rgba(255,255,255,0.28);
+      background: rgba(255,255,255,0.06);
+    }
+
+    .field-input::placeholder {
+      color: rgba(255,255,255,0.2);
+    }
+
+    /* Tags section */
+    .tags-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .tags-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.4);
+      flex-shrink: 0;
+    }
+
+    .tag-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .tag-grid::-webkit-scrollbar { width: 3px; }
+    .tag-grid::-webkit-scrollbar-track { background: transparent; }
+    .tag-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
+
+    .tag-btn {
+      padding: 5px 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 0;
+      cursor: pointer;
+      font-size: 9px;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: rgba(255,255,255,0.55);
+      transition: all 0.12s ease;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tag-btn:hover {
+      background: rgba(255,255,255,0.09);
+      color: #fff;
+      border-color: rgba(255,255,255,0.22);
+    }
+
+    .tag-btn.selected {
+      background: rgba(255,255,255,0.18);
+      border-color: rgba(255,255,255,0.45);
+      color: #fff;
+    }
+
+    .tags-empty {
+      font-size: 10px;
+      color: rgba(255,255,255,0.25);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 8px 0;
+    }
+
+    /* Footer */
+    .popup-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+
+    .save-btn {
+      padding: 8px 22px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 0;
+      color: #fff;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .save-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.2);
+      border-color: rgba(255,255,255,0.4);
+    }
+
+    .save-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .status-text {
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.0);
+      transition: color 0.15s;
+    }
+
+    .status-text.show {
+      color: rgba(255,255,255,0.7);
+    }
+
+    .status-text.error {
+      color: rgba(255, 80, 60, 0.85);
+    }
+  </style>
+</head>
+<body>
+  <div class="popup">
+
+    <div class="popup-header">
+      <span class="popup-title">Add Bookmark</span>
+      <span class="popup-mark">MANGER-MAKI</span>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="popupUrl">URL</label>
+      <input type="text" class="field-input" id="popupUrl" placeholder="https://example.com" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="popupTitle">Title</label>
+      <input type="text" class="field-input" id="popupTitle" placeholder="Page title">
+    </div>
+
+    <div class="tags-section">
+      <div class="tags-label">Tags</div>
+      <div class="tag-grid" id="popupTagGrid"></div>
+    </div>
+
+    <div class="popup-footer">
+      <span class="status-text" id="popupStatus">SAVED</span>
+      <button class="save-btn" id="popupSaveBtn">Save</button>
+    </div>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
