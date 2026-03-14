@@ -1,2 +1,1 @@
 This is a fully AI generated extension created in just 20 minutes but it has so many space for improvement after quick setup and using it for an hour it lacks in so many places but also better then my old and traditional one and *I will work to make it better and easier to use*
-<img width="1920" height="1044" alt="{0AB81247-C98F-4E19-BC63-5F4C665AFDB5}" src="https://github.com/user-attachments/assets/f99e9e79-d4e8-4bad-b1c5-ec40ccc8a5a0" />
