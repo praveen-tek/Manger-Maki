@@ -87,8 +87,8 @@
                 </div>
               </div>
               <div class="form-group">
-                <label class="form-label">Or upload image</label>
-                <input type="file" class="form-input" id="wallpaperUpload" accept="image/*">
+                <label class="form-label">Or upload image/video</label>
+                <input type="file" class="form-input" id="wallpaperUpload" accept="image/*,video/*">
               </div>
               <button class="btn btn-secondary" id="resetWallpaperBtn">Reset</button>
             </div>
@@ -180,6 +180,14 @@
           <div class="cust-row">
             <label class="cust-label">COMPACT MODE</label>
             <div class="cust-toggle-group" id="custCompact">
+              <button class="cust-toggle-btn active" data-val="false">OFF</button>
+              <button class="cust-toggle-btn" data-val="true">ON</button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">SHOW FAVICONS</label>
+            <div class="cust-toggle-group" id="custFavicons">
               <button class="cust-toggle-btn active" data-val="false">OFF</button>
               <button class="cust-toggle-btn" data-val="true">ON</button>
             </div>

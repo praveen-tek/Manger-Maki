@@ -152,9 +152,15 @@ function updateWallpaperPreview() {
   const url = Wallpaper.getPreviewUrl();
   wallpaperPreview.innerHTML = '';
   if (url) {
-    const img = document.createElement('img');
-    img.src = url;
-    wallpaperPreview.appendChild(img);
+    const isVideo = Wallpaper.isVideo(url);
+    const media = document.createElement(isVideo ? 'video' : 'img');
+    media.src = url;
+    if (isVideo) {
+      media.autoplay = true;
+      media.loop = true;
+      media.muted = true;
+    }
+    wallpaperPreview.appendChild(media);
   }
 }
 
@@ -246,6 +252,7 @@ function applyCustomize() {
   root.style.setProperty('--column-count', c.columnCount);
   root.style.setProperty('--bookmark-padding', c.compactMode ? '3px' : '7px');
   root.style.setProperty('--bookmark-transform', c.textTransform || 'uppercase');
+  root.classList.toggle('show-favicons', !!c.showFavicons);
 }
 
 function saveCustomize(patch) {
@@ -286,6 +293,9 @@ function refreshCustomizePanel() {
 
   // Compact mode
   setToggleActive('custCompact', String(c.compactMode));
+
+  // Favicons
+  setToggleActive('custFavicons', String(!!c.showFavicons));
 
   // Tag pills
   renderCustTagPills();
@@ -444,6 +454,17 @@ function attachEventListeners() {
       saveCustomize({ compactMode: isOn });
     };
   });
+
+  const custFavicons = $('custFavicons');
+  if (custFavicons) {
+    custFavicons.querySelectorAll('.cust-toggle-btn').forEach(btn => {
+      btn.onclick = () => {
+        const isOn = btn.dataset.val === 'true';
+        setToggleActive('custFavicons', btn.dataset.val);
+        saveCustomize({ showFavicons: isOn });
+      };
+    });
+  }
 
   document.onkeydown = e => {
     if (e.key === 'Escape') { closeAddModal(); closeSettings(); }

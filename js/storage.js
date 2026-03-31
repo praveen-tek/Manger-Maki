@@ -21,6 +21,7 @@ const Storage = {
     columnCount: 4,
     compactMode: false,
     textTransform: 'uppercase',
+    showFavicons: false,
   },
 
   DEFAULT_BOOKMARKS: [

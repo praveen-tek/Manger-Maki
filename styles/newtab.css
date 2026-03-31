@@ -193,6 +193,19 @@ motion-rotation: auto;
   opacity: 0.6;
 }
 
+.bookmark-favicon {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  display: none;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+:root.show-favicons .bookmark-favicon {
+  display: block;
+}
+
 .bookmark-label {
   font-size: var(--bookmark-font-size);
   font-weight: var(--bookmark-weight);

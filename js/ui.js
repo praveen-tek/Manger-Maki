@@ -136,7 +136,10 @@ const UI = {
       const a = document.createElement('a');
       a.href = item.url;
       a.className = 'bookmark';
-      a.innerHTML = `<span class="bookmark-label">${item.title}</span>`;
+      let hostname = '';
+      try { hostname = new URL(item.url).hostname; } catch(e) {}
+      const faviconHTML = hostname ? `<img class="bookmark-favicon" src="https://www.google.com/s2/favicons?domain=${hostname}&sz=32" alt="" loading="lazy">` : '';
+      a.innerHTML = `${faviconHTML}<span class="bookmark-label">${item.title}</span>`;
       list.appendChild(a);
     });
     section.appendChild(list);
@@ -194,7 +197,12 @@ const UI = {
       <circle cx="7" cy="12" r="1.4"/>
     </svg>`;
 
+    let hostname = '';
+    try { hostname = new URL(bookmark.url).hostname; } catch(e) {}
+    const faviconHTML = hostname ? `<img class="bookmark-favicon" src="https://www.google.com/s2/favicons?domain=${hostname}&sz=32" alt="" loading="lazy">` : '';
+
     a.innerHTML = `
+      ${faviconHTML}
       <span class="bookmark-label">${bookmark.title}</span>
       <button class="bookmark-menu" title="Options">${menuSVG}</button>
     `;
