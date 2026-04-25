@@ -4,8 +4,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  basePath: '/Manger-Maki',
-  assetPrefix: '/Manger-Maki/',
 };
 
 module.exports = nextConfig;

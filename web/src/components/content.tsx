@@ -5,7 +5,7 @@ export default function ContentSection() {
       <div className="mx-auto max-w-5xl space-y-8 px-6 md:space-y-12">
         <img
           className="grayscale"
-          src="/demo.png"
+          src="https://github.com/praveen-tek/Manger-Maki/blob/main/web/public/demo.png?raw=true"
           alt="team image"
           height=""
           width=""
