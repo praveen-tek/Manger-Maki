@@ -6,4 +6,5 @@ This is an AI-generated browser extension created in just 20 minutes. It has ple
 [Figma Design Link](https://www.figma.com/design/wAPCRRb6rNHE4A2k5uXGA8/Maki-Manager?node-id=0-1&t=Ozst4o0DOqOwtxnb-1)
 
 ### Preview
-![screenshot](./assets/demo/demo-1.png)
+<img width="1920" height="1000" alt="image" src="https://github.com/user-attachments/assets/71e9982b-3c44-4b74-9626-211fa44319a2" />
+
