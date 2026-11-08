@@ -1,13 +1,21 @@
-const nextConfig = {
-  output: 'export',
-  distDir: 'out',
+import type { NextConfig } from "next";
+
+const isGithubActions = process.env.GITHUB_ACTIONS === "true";
+const basePath = isGithubActions ? "/Manger-Maki" : "";
+
+const nextConfig: NextConfig = {
+  output: "export",
+  distDir: "out",
   images: {
     unoptimized: true,
   },
-  ...(process.env.GITHUB_ACTIONS === 'true' && {
-    basePath: '/Manger-Maki',
-    assetPrefix: '/Manger-Maki/',
+  env: {
+    NEXT_PUBLIC_BASE_PATH: basePath,
+  },
+  ...(isGithubActions && {
+    basePath,
+    assetPrefix: `${basePath}/`,
   }),
 };
 
-module.exports = nextConfig;
+export default nextConfig;

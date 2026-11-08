@@ -6,6 +6,8 @@ import { Newsreader } from "next/font/google";
 import { DownloadSimpleIcon } from "@phosphor-icons/react";
 import { PaperTexture } from "@paper-design/shaders-react";
 
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 const serif = Newsreader({ subsets: ["latin"], weight: ["300", "400"] });
 
 const LINKS = [
@@ -14,7 +16,7 @@ const LINKS = [
   { name: "Product Hunt", url: "https://producthunt.com", domain: "producthunt.com" },
   { name: "Dribbble", url: "https://dribbble.com", domain: "dribbble.com" },
   { name: "MDN", url: "https://developer.mozilla.org", domain: "developer.mozilla.org" },
-  { name: "Pinterest", url: "https://in.pinterest.com/pin/263882859414268502/", domain: "pinterest.com" },
+  { name: "Pinterest", url: "https://pinterest.com", domain: "pinterest.com" },
 ];
 
 export default function Hero() {
@@ -22,7 +24,7 @@ export default function Hero() {
     <section className="flex h-screen w-full items-center justify-center overflow-hidden bg-[#1c1c1c]">
       <div className="relative aspect-video w-[min(100vw,calc(100vh*16/9))] [container-type:inline-size]">
         <PaperTexture
-          fit="cover"
+          fit="contain"
           scale={0.9}
           blending={1}
           distortion={0.75}
@@ -42,7 +44,7 @@ export default function Hero() {
           wrinkles={1}
           wrinkleSize={0.65}
           drops={0.4}
-          image="/mnt.png"
+          image={`${BASE}/mnt.png`}
           colorBack="#00000000"
           colorPaper="#FFFFFF"
           colorShadow="#CCCCCC"
@@ -132,7 +134,7 @@ export default function Hero() {
         </footer>
 
         <Image
-          src="/logo-white.png"
+          src={`${BASE}/logo-white.png`}
           alt=""
           width={600}
           height={600}
