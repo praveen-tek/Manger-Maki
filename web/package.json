@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@paper-design/shaders-react": "0.0.82",
     "@phosphor-icons/react": "^2.1.10",
     "next": "16.2.4",
     "react": "19.2.4",

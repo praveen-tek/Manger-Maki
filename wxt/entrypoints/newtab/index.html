@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab</title>
+</head>
+<body>
+
+  <div class="wallpaper-container" id="wallpaperContainer"></div>
+
+  <div class="content">
+
+    <div class="header">
+      <div class="filters" id="filters"></div>
+      <div class="header-right">
+        <button class="icon-btn" id="settingsBtn" title="Settings"></button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div id="bookmarksList"></div>
+      <div class="empty-state" id="emptyState">
+        <div class="empty-text">No bookmarks found</div>
+        <button class="btn btn-secondary" id="addBookmarkBtn"></button>
+      </div>
+    </div>
+
+    <button class="fab" id="addBtn" title="Add Bookmark (Ctrl+K)"></button>
+
+  </div>
+
+  <!-- Add Bookmark Modal -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="addModalTitle">Add Bookmark</h2>
+        <button class="modal-close" id="closeAddModal" title="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="urlInput">URL</label>
+          <input type="text" class="form-input" id="urlInput" placeholder="https://example.com" spellcheck="false" autocomplete="off">
+          <div class="form-error" id="urlError"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="titleInput">Title</label>
+          <input type="text" class="form-input" id="titleInput" placeholder="Example" spellcheck="false">
+          <div class="form-error" id="titleError"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tags</label>
+          <div id="tagList" class="tag-grid"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Group</label>
+          <div id="groupList" class="tag-grid"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelAddBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveBookmarkBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h2 id="settingsModalTitle">Settings</h2>
+        <button class="modal-close" id="closeSettingsModal" title="Close"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- WALLPAPER -->
+        <div class="settings-section">
+          <h3 id="sectionWallpaperTitle">Wallpaper</h3>
+          <div class="wallpaper-options">
+            <div class="wallpaper-preview" id="wallpaperPreview"></div>
+            <div class="wallpaper-controls">
+              <div class="form-group">
+                <label class="form-label" for="wallpaperInput">Wallpaper URL</label>
+                <div style="display:flex;gap:8px;">
+                  <input type="text" class="form-input" id="wallpaperInput" placeholder="https://example.com/image.jpg" spellcheck="false" style="flex:1;">
+                  <button class="btn btn-secondary" id="applyWallpaperBtn">Apply</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="wallpaperUpload">Or upload image / video</label>
+                <input type="file" class="form-input" id="wallpaperUpload" accept="image/*,video/*">
+              </div>
+              <button class="btn btn-secondary" id="resetWallpaperBtn"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- GROUPS -->
+        <div class="settings-section">
+          <h3 id="sectionGroupsTitle">Groups</h3>
+          <div id="groupManager"></div>
+          <div class="add-row" style="margin-top:10px;">
+            <input type="text" class="form-input" id="newGroupInput" placeholder="New group name" style="flex:1;">
+            <button class="btn btn-secondary" id="addGroupBtn">Add</button>
+          </div>
+        </div>
+
+        <!-- BOOKMARKS LIST -->
+        <div class="settings-section">
+          <h3 id="sectionBookmarksTitle">Bookmarks</h3>
+          <div id="settingsBookmarksList"></div>
+        </div>
+
+        <!-- CUSTOMIZE -->
+        <div class="settings-section">
+          <h3 id="sectionCustomizeTitle">Customize</h3>
+
+          <!-- Typography -->
+          <div class="cust-sub-label">Typography</div>
+
+          <div class="cust-row">
+            <label class="cust-label" for="custFontSize">
+              Font Size <span class="cust-val" id="custFontSizeVal">13px</span>
+            </label>
+            <input type="range" class="cust-slider" id="custFontSize" min="10" max="18" step="1" value="13">
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">Font Color</label>
+            <div class="cust-color-row">
+              <input type="color" class="cust-color-input" id="custFontColor" value="#ffffff" title="Custom color">
+              <button class="cust-swatch" data-color="#ffffff" style="background:#ffffff;" title="#ffffff"></button>
+              <button class="cust-swatch" data-color="#f5f0e8" style="background:#f5f0e8;" title="Warm white"></button>
+              <button class="cust-swatch" data-color="rgba(255,255,255,0.6)" style="background:rgba(255,255,255,0.6);" title="Muted"></button>
+              <button class="cust-swatch" data-color="#f5c842" style="background:#f5c842;" title="Amber"></button>
+              <button class="cust-swatch" data-color="#a8c5a0" style="background:#a8c5a0;" title="Soft green"></button>
+              <button class="cust-swatch" data-color="#e8a0a0" style="background:#e8a0a0;" title="Soft red"></button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">Font Weight</label>
+            <div class="cust-toggle-group" id="custFontWeight">
+              <button class="cust-toggle-btn" data-val="normal">Regular</button>
+              <button class="cust-toggle-btn active" data-val="bold">Bold</button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">Text Transform</label>
+            <div class="cust-toggle-group" id="custTextTransform">
+              <button class="cust-toggle-btn active" data-val="uppercase">Upper</button>
+              <button class="cust-toggle-btn" data-val="lowercase">Lower</button>
+              <button class="cust-toggle-btn" data-val="none">None</button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label" for="custSpacing">
+              Letter Spacing <span class="cust-val" id="custSpacingVal">0.2px</span>
+            </label>
+            <input type="range" class="cust-slider" id="custSpacing" min="0" max="3" step="0.1" value="0.2">
+          </div>
+
+          <!-- Tags -->
+          <div class="cust-sub-label" style="margin-top:18px;">Tags</div>
+          <div class="cust-tag-pills" id="custTagPills"></div>
+          <div class="add-row">
+            <input type="text" class="form-input" id="custNewTagInput" placeholder="New tag name" maxlength="20" style="flex:1;">
+            <button class="btn btn-secondary" id="custAddTagBtn">Add</button>
+          </div>
+          <div class="form-error" id="custTagError"></div>
+
+          <!-- Layout -->
+          <div class="cust-sub-label" style="margin-top:18px;">Layout</div>
+
+          <div class="cust-row">
+            <label class="cust-label">Columns</label>
+            <div class="cust-toggle-group" id="custColumns">
+              <button class="cust-toggle-btn" data-val="2">2</button>
+              <button class="cust-toggle-btn" data-val="3">3</button>
+              <button class="cust-toggle-btn active" data-val="4">4</button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">Compact Mode</label>
+            <div class="cust-toggle-group" id="custCompact">
+              <button class="cust-toggle-btn active" data-val="false">Off</button>
+              <button class="cust-toggle-btn" data-val="true">On</button>
+            </div>
+          </div>
+
+          <div class="cust-row">
+            <label class="cust-label">Show Favicons</label>
+            <div class="cust-toggle-group" id="custFavicons">
+              <button class="cust-toggle-btn active" data-val="false">Off</button>
+              <button class="cust-toggle-btn" data-val="true">On</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- DATA -->
+        <div class="settings-section">
+          <h3 id="sectionDataTitle">Data</h3>
+          <div class="data-controls">
+            <button class="btn btn-secondary" id="exportBtn"></button>
+            <button class="btn btn-secondary" id="importBtn"></button>
+            <button class="btn btn-danger" id="clearBtn"></button>
+          </div>
+          <input type="file" id="importFile" accept=".json" style="display:none;">
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="closeSettingsBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

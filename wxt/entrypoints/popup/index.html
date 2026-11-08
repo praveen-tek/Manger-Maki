@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manger-Maki</title>
+</head>
+<body>
+  <div class="popup">
+    <div class="popup-header">
+      <span class="popup-title" id="headerTitle">Add Bookmark</span>
+      <span class="popup-mark">MANGER-MAKI</span>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="popupUrl">URL</label>
+      <input type="text" class="field-input" id="popupUrl" placeholder="https://example.com" spellcheck="false" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="popupTitle">Title</label>
+      <input type="text" class="field-input" id="popupTitle" placeholder="Page title" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="popupGroup">Group</label>
+      <select class="field-input" id="popupGroup">
+        <option value="">None</option>
+      </select>
+    </div>
+
+    <div class="tags-section">
+      <div class="tags-label">Tags</div>
+      <div class="tag-grid" id="popupTagGrid"></div>
+    </div>
+
+    <div class="popup-footer">
+      <span class="status-text" id="popupStatus"></span>
+      <button class="save-btn" id="popupSaveBtn">Save</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+:root {
+  --bookmark-font-size: 13px;
+  --bookmark-color: #ffffff;
+  --bookmark-weight: bold;
+  --bookmark-spacing: 0.2px;
+  --column-count: 4;
+  --bookmark-padding: 7px;
+  --bookmark-transform: uppercase;
+
+  --bg-base: #000000;
+  --bg-surface: #0d0d0d;
+  --bg-card: rgba(255, 255, 255, 0.04);
+  --bg-card-hover: rgba(255, 255, 255, 0.08);
+  --bg-card-active: rgba(255, 255, 255, 0.16);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.15);
+  --border-bright: rgba(255, 255, 255, 0.35);
+  --text-primary: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-faint: rgba(255, 255, 255, 0.3);
+  --color-danger: #ff453a;
+  --color-gold: #f5c842;
+
+  --font-mono: 'Courier New', 'Lucida Console', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Phosphor Icon standard styling */
+.ph-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  fill: currentColor;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Focus outline for accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 1px solid var(--border-bright);
+  outline-offset: 1px;
+}

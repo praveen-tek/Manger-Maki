@@ -1,0 +1,218 @@
+@import './base.css';
+
+html, body {
+  width: 320px;
+  height: 420px;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.popup {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+  gap: 12px;
+}
+
+/* Header */
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.popup-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+}
+
+.popup-mark {
+  font-size: 9px;
+  color: var(--text-faint);
+  letter-spacing: 1.2px;
+}
+
+/* Form fields */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.field-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-faint);
+}
+
+.field-input {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.field-input:focus {
+  border-color: var(--border-bright);
+  background: var(--bg-card-hover);
+}
+
+.field-input::placeholder {
+  color: var(--text-faint);
+}
+
+select.field-input {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' width='12' height='12' fill='%23888'%3e%3cpath d='M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+select.field-input option {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* Tags section */
+.tags-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.tags-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 2px;
+}
+
+.tag-btn {
+  padding: 5px 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  transition: all 0.12s ease;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+}
+
+.tag-btn.selected {
+  background: var(--bg-card-active);
+  border-color: var(--border-bright);
+  color: var(--text-primary);
+}
+
+.tags-empty {
+  font-size: 10px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 8px 0;
+}
+
+/* Footer */
+.popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 18px;
+  background: var(--bg-card-active);
+  border: 1px solid var(--border-bright);
+  border-radius: 0;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: transparent;
+  transition: color 0.15s;
+}
+
+.status-text.show {
+  color: var(--text-muted);
+}
+
+.status-text.error {
+  color: var(--color-danger);
+}
