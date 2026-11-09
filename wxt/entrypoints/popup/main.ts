@@ -80,7 +80,7 @@ function clearStatus() {
 }
 
 async function saveBookmark() {
-  const url = urlInput.value.trim();
+  let url = urlInput.value.trim();
   const title = titleInput.value.trim();
   const group = groupSelect.value || null;
 
@@ -93,6 +93,11 @@ async function saveBookmark() {
     showStatus('TITLE REQUIRED', true);
     titleInput.focus();
     return;
+  }
+
+  // Prepend https:// if protocol is missing
+  if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url}`;
   }
 
   try {
@@ -116,7 +121,7 @@ async function saveBookmark() {
     showStatus('SAVED');
     setTimeout(() => {
       window.close();
-    }, 800);
+    }, 600);
   } catch {
     saveBtn.disabled = false;
     showStatus('SAVE FAILED', true);
@@ -146,6 +151,20 @@ function wireEventListeners() {
   saveBtn.addEventListener('click', saveBookmark);
   urlInput.addEventListener('input', clearStatus);
   titleInput.addEventListener('input', clearStatus);
+
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveBookmark();
+    }
+  });
+
+  titleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveBookmark();
+    }
+  });
 
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {

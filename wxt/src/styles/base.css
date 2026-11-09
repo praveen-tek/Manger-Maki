@@ -48,7 +48,7 @@ html, body {
   vertical-align: middle;
   flex-shrink: 0;
   fill: currentColor;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition: opacity 0.15s ease, fill 0.15s ease, color 0.15s ease;
 }
 
 /* Scrollbars */

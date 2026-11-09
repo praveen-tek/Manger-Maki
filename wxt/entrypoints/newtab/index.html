@@ -21,6 +21,7 @@
     <div class="main">
       <div id="bookmarksList"></div>
       <div class="empty-state" id="emptyState">
+        <div class="empty-icon" id="emptyIcon"></div>
         <div class="empty-text">No bookmarks found</div>
         <button class="btn btn-secondary" id="addBookmarkBtn"></button>
       </div>
@@ -98,7 +99,7 @@
         <!-- GROUPS -->
         <div class="settings-section">
           <h3 id="sectionGroupsTitle">Groups</h3>
-          <div id="groupManager"></div>
+          <div id="groupManager" class="group-manager"></div>
           <div class="add-row" style="margin-top:10px;">
             <input type="text" class="form-input" id="newGroupInput" placeholder="New group name" style="flex:1;">
             <button class="btn btn-secondary" id="addGroupBtn">Add</button>
@@ -108,7 +109,7 @@
         <!-- BOOKMARKS LIST -->
         <div class="settings-section">
           <h3 id="sectionBookmarksTitle">Bookmarks</h3>
-          <div id="settingsBookmarksList"></div>
+          <div id="settingsBookmarksList" class="settings-bookmarks-list"></div>
         </div>
 
         <!-- CUSTOMIZE -->

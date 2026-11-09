@@ -23,6 +23,7 @@ function setupStaticIcons() {
   $('addBtn').innerHTML = getIconSvg('plus', { size: 22 });
   $('closeAddModal').innerHTML = getIconSvg('x', { size: 16 });
   $('closeSettingsModal').innerHTML = getIconSvg('x', { size: 16 });
+  $('emptyIcon').innerHTML = getIconSvg('folder', { size: 36 });
   $('addBookmarkBtn').innerHTML = `${getIconSvg('plus', { size: 13 })} Add first bookmark`;
 
   // Modal Section Headers
@@ -49,22 +50,35 @@ function showNotification(message: string, duration = 2500) {
   document.body.appendChild(toast);
 
   setTimeout(() => {
-    toast.style.animation = 'slideOut 0.2s ease forwards';
+    toast.classList.add('fade-out');
     setTimeout(() => toast.remove(), 200);
   }, duration);
+}
+
+// ── Responsive Layout Helper ───────────────────────────────────
+function getResponsiveColumnCount(): number {
+  const c = Storage.getCustomize();
+  const userCols = c.columnCount || 4;
+  const width = window.innerWidth;
+  if (width < 600) return 1;
+  if (width < 960) return Math.min(2, userCols);
+  if (width < 1300) return Math.min(3, userCols);
+  return userCols;
 }
 
 // ── Customize Styles ───────────────────────────────────────────
 function applyCustomize() {
   const c = Storage.getCustomize();
   const root = document.documentElement;
+  const effectiveCols = getResponsiveColumnCount();
 
   root.style.setProperty('--bookmark-font-size', `${c.fontSize}px`);
   root.style.setProperty('--bookmark-color', c.fontColor);
   root.style.setProperty('--bookmark-weight', c.fontWeight);
   root.style.setProperty('--bookmark-spacing', `${c.letterSpacing}px`);
   root.style.setProperty('--column-count', String(c.columnCount));
-  root.style.setProperty('--bookmark-padding', c.compactMode ? '3px' : '7px');
+  root.style.setProperty('--effective-columns', String(effectiveCols));
+  root.style.setProperty('--bookmark-padding', c.compactMode ? '4px' : '7px');
   root.style.setProperty('--bookmark-transform', c.textTransform || 'uppercase');
   root.classList.toggle('show-favicons', !!c.showFavicons);
 }
@@ -153,6 +167,12 @@ function createBookmarkElement(bookmark: Bookmark, isStarredView = false): HTMLE
     Storage.addVisit(bookmark.url, bookmark.title);
   };
 
+  // Context menu on right-click
+  a.oncontextmenu = (e) => {
+    e.preventDefault();
+    showBookmarkContextMenu(e, bookmark);
+  };
+
   return a;
 }
 
@@ -170,7 +190,7 @@ function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
   starItem.type = 'button';
   starItem.className = 'context-menu-item';
   const starIcon = isStarred ? getIconSvg('star', { size: 13 }) : getIconSvg('starFill', { size: 13 });
-  starItem.innerHTML = `${starIcon} ${isStarred ? 'Unstar' : 'Star'}`;
+  starItem.innerHTML = `${starIcon} <span>${isStarred ? 'Unstar' : 'Star'}</span>`;
   starItem.onclick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -183,7 +203,7 @@ function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
   const deleteItem = document.createElement('button');
   deleteItem.type = 'button';
   deleteItem.className = 'context-menu-item danger';
-  deleteItem.innerHTML = `${getIconSvg('trash', { size: 13 })} Remove`;
+  deleteItem.innerHTML = `${getIconSvg('trash', { size: 13 })} <span>Remove</span>`;
   deleteItem.onclick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -200,18 +220,42 @@ function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
   menu.appendChild(deleteItem);
 
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  menu.style.left = `${Math.min(window.innerWidth - 150, Math.max(10, rect.right - 100))}px`;
-  menu.style.top = `${rect.bottom + 4}px`;
+  const menuWidth = 140;
+  const menuHeight = 78;
+
+  let left = Math.min(window.innerWidth - menuWidth - 12, Math.max(12, rect.right - menuWidth));
+  let top = rect.bottom + 4;
+  if (top + menuHeight > window.innerHeight - 8) {
+    top = Math.max(8, rect.top - menuHeight - 4);
+  }
+
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
 
   document.body.appendChild(menu);
 
+  const cleanup = () => {
+    menu.remove();
+    document.removeEventListener('click', handleOutsideClick);
+    window.removeEventListener('scroll', handleScroll, true);
+    window.removeEventListener('resize', handleScroll);
+  };
+
   const handleOutsideClick = (e: MouseEvent) => {
     if (!menu.contains(e.target as Node) && e.target !== event.currentTarget) {
-      menu.remove();
-      document.removeEventListener('click', handleOutsideClick);
+      cleanup();
     }
   };
-  setTimeout(() => document.addEventListener('click', handleOutsideClick), 0);
+
+  const handleScroll = () => {
+    cleanup();
+  };
+
+  setTimeout(() => {
+    document.addEventListener('click', handleOutsideClick);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+  }, 0);
 }
 
 // ── Render Bookmarks ───────────────────────────────────────────
@@ -245,8 +289,7 @@ function renderBookmarks() {
 }
 
 function renderMasonryView(container: HTMLElement, bookmarks: Bookmark[]) {
-  const customize = Storage.getCustomize();
-  const numColumns = customize.columnCount || 4;
+  const numColumns = getResponsiveColumnCount();
 
   const masonry = document.createElement('div');
   masonry.className = 'masonry-container';
@@ -287,7 +330,7 @@ function renderMasonryView(container: HTMLElement, bookmarks: Bookmark[]) {
 
   bookmarks.forEach((b) => {
     if (starred.includes(b.id)) return;
-    const tags = b.tags && b.tags.length ? b.tags : ['_none'];
+    const tags = b.tags && b.tags.length ? b.tags : (b.group ? [`group:${b.group}`] : ['_none']);
     tags.forEach((t) => {
       if (!byTag[t]) byTag[t] = [];
       const key = `${b.id}-${t}`;
@@ -299,6 +342,11 @@ function renderMasonryView(container: HTMLElement, bookmarks: Bookmark[]) {
   });
 
   const orderedTags = tagOrder.filter((t) => byTag[t] && byTag[t].length);
+  Object.keys(byTag).forEach((t) => {
+    if (t !== '_none' && !orderedTags.includes(t)) {
+      orderedTags.push(t);
+    }
+  });
   if (byTag['_none'] && byTag['_none'].length) orderedTags.push('_none');
 
   orderedTags.forEach((tag) => {
@@ -422,10 +470,20 @@ function createTagSection(tag: string, items: Bookmark[]): HTMLElement {
 
   const header = document.createElement('div');
   header.className = 'group-header';
-  const label = tag === '_none' ? 'Other' : tag;
+
+  let label = tag === '_none' ? 'Other' : tag;
+  let iconName: 'tag' | 'folder' = 'tag';
+
+  if (tag.startsWith('group:')) {
+    const groupId = tag.slice(6);
+    const g = Bookmarks.getGroups().find((group) => group.id === groupId);
+    label = g ? g.name : 'Group';
+    iconName = 'folder';
+  }
+
   header.innerHTML = `
     <span class="group-name">
-      ${getIconSvg('tag', { size: 11 })} ${label}
+      ${getIconSvg(iconName, { size: 11 })} ${label}
     </span>
   `;
   section.appendChild(header);
@@ -520,7 +578,7 @@ async function saveBookmarkFromModal() {
 
   const urlInput = $<HTMLInputElement>('urlInput');
   const titleInput = $<HTMLInputElement>('titleInput');
-  const url = urlInput.value.trim();
+  let url = urlInput.value.trim();
   const title = titleInput.value.trim();
   let hasError = false;
 
@@ -533,6 +591,10 @@ async function saveBookmarkFromModal() {
     hasError = true;
   }
   if (hasError) return;
+
+  if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url}`;
+  }
 
   try {
     await Bookmarks.add({
@@ -569,6 +631,7 @@ function refreshSettingsLists() {
 
 function renderSettingsBookmarks() {
   const container = $('settingsBookmarksList');
+  container.className = 'settings-bookmarks-list';
   container.innerHTML = '';
 
   const bookmarks = Bookmarks.getAll();
@@ -611,6 +674,7 @@ function renderSettingsBookmarks() {
 
 function renderSettingsGroups() {
   const container = $('groupManager');
+  container.className = 'group-manager';
   container.innerHTML = '';
 
   const groups = Bookmarks.getGroups();
@@ -909,6 +973,13 @@ function wireEventListeners() {
     if (e.target === $('addModal')) closeAddModal();
   };
 
+  $<HTMLInputElement>('urlInput').onkeydown = (e) => {
+    if (e.key === 'Enter') saveBookmarkFromModal();
+  };
+  $<HTMLInputElement>('titleInput').onkeydown = (e) => {
+    if (e.key === 'Enter') saveBookmarkFromModal();
+  };
+
   // Settings modal trigger
   $('settingsBtn').onclick = openSettingsModal;
   $('closeSettingsModal').onclick = closeSettingsModal;
@@ -1036,6 +1107,16 @@ function wireEventListeners() {
       const addModal = $('addModal');
       addModal.classList.contains('active') ? closeAddModal() : openAddModal();
     }
+  });
+
+  // Responsive window resize listener
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  window.addEventListener('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      applyCustomize();
+      renderBookmarks();
+    }, 120);
   });
 }
 
