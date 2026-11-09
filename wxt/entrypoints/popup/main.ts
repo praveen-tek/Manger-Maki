@@ -3,7 +3,7 @@ import { Storage } from '../../src/storage';
 import { getIconSvg } from '../../src/icons';
 import { browser } from 'wxt/browser';
 
-let selectedTags: string[] = [];
+const selectedTags = new Set<string>();
 
 const urlInput = document.getElementById('popupUrl') as HTMLInputElement;
 const titleInput = document.getElementById('popupTitle') as HTMLInputElement;
@@ -11,60 +11,41 @@ const tagGrid = document.getElementById('popupTagGrid') as HTMLDivElement;
 const groupSelect = document.getElementById('popupGroup') as HTMLSelectElement;
 const saveBtn = document.getElementById('popupSaveBtn') as HTMLButtonElement;
 const statusText = document.getElementById('popupStatus') as HTMLSpanElement;
-const headerTitle = document.getElementById('headerTitle') as HTMLSpanElement;
-
-// Add Phosphor icon to header and save button
-if (headerTitle) {
-  headerTitle.innerHTML = `${getIconSvg('tag', { size: 14 })} Add Bookmark`;
-}
-if (saveBtn) {
-  saveBtn.innerHTML = `${getIconSvg('plus', { size: 13 })} Save`;
-}
 
 function renderTags() {
   const tags = Storage.getTags();
-  tagGrid.innerHTML = '';
-
   if (!tags.length) {
-    const empty = document.createElement('div');
-    empty.className = 'tags-empty';
-    empty.textContent = 'No tags defined';
-    tagGrid.appendChild(empty);
+    tagGrid.innerHTML = '<div class="tags-empty">No tags defined</div>';
     return;
   }
 
-  tags.forEach((tag) => {
+  const frag = document.createDocumentFragment();
+  for (const tag of tags) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `tag-btn ${selectedTags.includes(tag) ? 'selected' : ''}`;
+    btn.className = `tag-btn${selectedTags.has(tag) ? ' selected' : ''}`;
     btn.textContent = tag;
     btn.title = tag;
-    btn.onclick = () => {
-      if (selectedTags.includes(tag)) {
-        selectedTags = selectedTags.filter((t) => t !== tag);
-        btn.classList.remove('selected');
-      } else {
-        selectedTags.push(tag);
-        btn.classList.add('selected');
-      }
-    };
-    tagGrid.appendChild(btn);
-  });
+    btn.dataset.tag = tag;
+    frag.appendChild(btn);
+  }
+  tagGrid.replaceChildren(frag);
 }
 
 function renderGroups() {
   const groups = Storage.getGroups();
-  // Clear any existing options beyond "None"
-  while (groupSelect.options.length > 1) {
-    groupSelect.remove(1);
-  }
+  groupSelect.length = 1;
 
-  groups.forEach((group) => {
-    const option = document.createElement('option');
-    option.value = group.id;
-    option.textContent = group.name;
-    groupSelect.appendChild(option);
-  });
+  if (groups.length > 0) {
+    const frag = document.createDocumentFragment();
+    for (const group of groups) {
+      const opt = document.createElement('option');
+      opt.value = group.id;
+      opt.textContent = group.name;
+      frag.appendChild(opt);
+    }
+    groupSelect.appendChild(frag);
+  }
 }
 
 function showStatus(msg: string, isError = false) {
@@ -95,7 +76,6 @@ async function saveBookmark() {
     return;
   }
 
-  // Prepend https:// if protocol is missing
   if (!/^https?:\/\//i.test(url)) {
     url = `https://${url}`;
   }
@@ -114,43 +94,55 @@ async function saveBookmark() {
     await Storage.addBookmark({
       title,
       url,
-      tags: [...selectedTags],
+      tags: Array.from(selectedTags),
       group,
     });
 
     showStatus('SAVED');
     setTimeout(() => {
       window.close();
-    }, 600);
+    }, 450);
   } catch {
     saveBtn.disabled = false;
     showStatus('SAVE FAILED', true);
   }
 }
 
-async function prefillActiveTab() {
+async function queryActiveTab(): Promise<{ url?: string; title?: string } | null> {
   try {
     if (browser.tabs?.query) {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (tab) {
-        if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:')) {
-          urlInput.value = tab.url;
-        }
-        if (tab.title) {
-          titleInput.value = tab.title;
-        }
-        titleInput.select();
+        return {
+          url: tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('about:') ? tab.url : undefined,
+          title: tab.title || undefined,
+        };
       }
     }
   } catch (err) {
     console.warn('Could not query active tab', err);
   }
+  return null;
 }
 
 function wireEventListeners() {
+  // Event delegation on tag grid
+  tagGrid.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.tag-btn');
+    if (!btn?.dataset.tag) return;
+    const tag = btn.dataset.tag;
+    if (selectedTags.has(tag)) {
+      selectedTags.delete(tag);
+      btn.classList.remove('selected');
+    } else {
+      selectedTags.add(tag);
+      btn.classList.add('selected');
+    }
+  });
+
   saveBtn.addEventListener('click', saveBookmark);
-  urlInput.addEventListener('input', clearStatus);
-  titleInput.addEventListener('input', clearStatus);
+  urlInput.addEventListener('input', clearStatus, { passive: true });
+  titleInput.addEventListener('input', clearStatus, { passive: true });
 
   urlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -170,18 +162,25 @@ function wireEventListeners() {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       saveBookmark();
-    }
-    if (e.key === 'Escape') {
+    } else if (e.key === 'Escape') {
       window.close();
     }
   });
 }
 
 async function init() {
-  await Storage.init();
+  // Query tab info and initialize storage in parallel
+  const [_, tab] = await Promise.all([Storage.init(), queryActiveTab()]);
+
   renderTags();
   renderGroups();
-  await prefillActiveTab();
+
+  if (tab) {
+    if (tab.url) urlInput.value = tab.url;
+    if (tab.title) titleInput.value = tab.title;
+    titleInput.select();
+  }
+
   wireEventListeners();
 }
 

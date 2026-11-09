@@ -1,57 +1,56 @@
 import '../../src/styles/newtab.css';
 import { Bookmarks } from '../../src/bookmarks';
-import { getIconSvg } from '../../src/icons';
-import { Storage } from '../../src/storage';
-import type { Bookmark, RecentVisit } from '../../src/types';
+import { getIconNode, getIconSvg } from '../../src/icons';
+import { Storage, type StorageChangeKey } from '../../src/storage';
+import type { Bookmark, CustomizeConfig, RecentVisit } from '../../src/types';
 import { Wallpaper } from '../../src/wallpaper';
 
 // ── State ──────────────────────────────────────────────────────
 let currentFilter = 'All';
-let selectedTags: string[] = [];
+const selectedTags = new Set<string>();
 let selectedGroup: string | null = null;
+const bookmarkMap = new Map<number, Bookmark>();
 
-// ── DOM Element Helper ─────────────────────────────────────────
+// ── DOM Helper ─────────────────────────────────────────────────
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`Element #${id} not found`);
-  return el as T;
+  return document.getElementById(id) as T;
 };
 
-// ── Initialize Icons in Static HTML ────────────────────────────
-function setupStaticIcons() {
-  $('settingsBtn').innerHTML = getIconSvg('gear', { size: 16 });
-  $('addBtn').innerHTML = getIconSvg('plus', { size: 22 });
-  $('closeAddModal').innerHTML = getIconSvg('x', { size: 16 });
-  $('closeSettingsModal').innerHTML = getIconSvg('x', { size: 16 });
-  $('emptyIcon').innerHTML = getIconSvg('folder', { size: 36 });
-  $('addBookmarkBtn').innerHTML = `${getIconSvg('plus', { size: 13 })} Add first bookmark`;
-
-  // Modal Section Headers
-  $('addModalTitle').innerHTML = `${getIconSvg('plus', { size: 15 })} Add Bookmark`;
-  $('settingsModalTitle').innerHTML = `${getIconSvg('gear', { size: 15 })} Settings`;
-  $('sectionWallpaperTitle').innerHTML = `${getIconSvg('sliders', { size: 14 })} Wallpaper`;
-  $('sectionGroupsTitle').innerHTML = `${getIconSvg('folder', { size: 14 })} Groups`;
-  $('sectionBookmarksTitle').innerHTML = `${getIconSvg('tag', { size: 14 })} Bookmarks`;
-  $('sectionCustomizeTitle').innerHTML = `${getIconSvg('sliders', { size: 14 })} Customize`;
-  $('sectionDataTitle').innerHTML = `${getIconSvg('exportIcon', { size: 14 })} Data & Backup`;
-
-  // Buttons with icons
-  $('resetWallpaperBtn').innerHTML = `${getIconSvg('arrowCounterClockwise', { size: 13 })} Reset`;
-  $('exportBtn').innerHTML = `${getIconSvg('exportIcon', { size: 14 })} Export Data (JSON)`;
-  $('importBtn').innerHTML = `${getIconSvg('uploadSimple', { size: 14 })} Import Data (JSON)`;
-  $('clearBtn').innerHTML = `${getIconSvg('trash', { size: 14 })} Clear All Data`;
+// ── Fast URL Hostname Parser ───────────────────────────────────
+function getDomain(url: string): string {
+  try {
+    const idx = url.indexOf('://');
+    const start = idx === -1 ? 0 : idx + 3;
+    const slash = url.indexOf('/', start);
+    const host = slash === -1 ? url.slice(start) : url.slice(start, slash);
+    const colon = host.indexOf(':');
+    return colon === -1 ? host : host.slice(0, colon);
+  } catch {
+    return '';
+  }
 }
 
 // ── Notification Toast ─────────────────────────────────────────
+let activeToast: HTMLElement | null = null;
+let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
 function showNotification(message: string, duration = 2500) {
+  if (activeToast) {
+    activeToast.remove();
+    if (toastTimeout) clearTimeout(toastTimeout);
+  }
   const toast = document.createElement('div');
   toast.className = 'notification';
   toast.innerHTML = `${getIconSvg('check', { size: 14 })} <span>${message}</span>`;
   document.body.appendChild(toast);
+  activeToast = toast;
 
-  setTimeout(() => {
+  toastTimeout = setTimeout(() => {
     toast.classList.add('fade-out');
-    setTimeout(() => toast.remove(), 200);
+    setTimeout(() => {
+      toast.remove();
+      if (activeToast === toast) activeToast = null;
+    }, 200);
   }, duration);
 }
 
@@ -83,109 +82,104 @@ function applyCustomize() {
   root.classList.toggle('show-favicons', !!c.showFavicons);
 }
 
-async function saveCustomizePatch(patch: Parameters<typeof Storage.saveCustomize>[0]) {
-  await Storage.saveCustomize(patch);
-  applyCustomize();
+let debouncedCustomizeTimer: ReturnType<typeof setTimeout> | null = null;
+function debouncedSaveCustomize(patch: Partial<CustomizeConfig>) {
+  if (debouncedCustomizeTimer) clearTimeout(debouncedCustomizeTimer);
+  debouncedCustomizeTimer = setTimeout(() => {
+    Storage.saveCustomize(patch);
+  }, 120);
 }
 
 // ── Filter Pills ───────────────────────────────────────────────
 function renderFilters() {
   const container = $('filters');
-  container.innerHTML = '';
-
   const tags = ['All', ...Bookmarks.getTags()];
-  tags.forEach((tag) => {
+  const frag = document.createDocumentFragment();
+
+  for (const tag of tags) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `filter-pill ${currentFilter === tag ? 'active' : ''}`;
+    btn.className = `filter-pill${currentFilter === tag ? ' active' : ''}`;
     btn.textContent = tag;
-    btn.onclick = () => {
-      currentFilter = tag;
-      renderFilters();
-      renderBookmarks();
-    };
-    container.appendChild(btn);
-  });
+    btn.dataset.tag = tag;
+    frag.appendChild(btn);
+  }
+
+  container.replaceChildren(frag);
 }
 
 // ── Bookmark Element Builder ───────────────────────────────────
-function createBookmarkElement(bookmark: Bookmark, isStarredView = false): HTMLElement {
+function createBookmarkElement(
+  bookmark: Bookmark,
+  isStarredView = false,
+  showFavicons = false,
+  isStarred = false
+): HTMLElement {
   const a = document.createElement('a');
   a.href = bookmark.url;
   a.className = 'bookmark';
-  a.title = `${bookmark.title} — ${bookmark.url}`;
+  a.title = `${bookmark.title} \u2014 ${bookmark.url}`;
+  a.dataset.id = String(bookmark.id);
+  a.dataset.url = bookmark.url;
+  a.dataset.title = bookmark.title;
 
-  // Favicon handling
-  let hostname = '';
-  try {
-    hostname = new URL(bookmark.url).hostname;
-  } catch {
-    // ignore
-  }
-
-  const favicon = document.createElement('img');
-  favicon.className = 'bookmark-favicon';
-  favicon.alt = '';
-  favicon.loading = 'lazy';
-  if (hostname) {
-    favicon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`;
-    favicon.onerror = () => {
-      favicon.style.display = 'none';
-    };
+  if (showFavicons) {
+    const hostname = getDomain(bookmark.url);
+    if (hostname) {
+      const favicon = document.createElement('img');
+      favicon.className = 'bookmark-favicon';
+      favicon.alt = '';
+      favicon.loading = 'lazy';
+      favicon.decoding = 'async';
+      favicon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`;
+      favicon.onerror = () => {
+        favicon.style.display = 'none';
+      };
+      a.appendChild(favicon);
+    }
   }
 
   const label = document.createElement('span');
   label.className = 'bookmark-label';
   label.textContent = bookmark.title;
-
-  a.appendChild(favicon);
   a.appendChild(label);
 
-  const isStarred = Storage.isStarred(bookmark.id);
   if (isStarred && !isStarredView) {
     const starBadge = document.createElement('span');
     starBadge.className = 'bookmark-star-badge';
-    starBadge.innerHTML = getIconSvg('starFill', { size: 11 });
+    starBadge.appendChild(getIconNode('starFill', 11));
     a.appendChild(starBadge);
   }
 
-  // Kebab menu button
+  // Kebab menu button (cloned from SVG node cache)
   const menuBtn = document.createElement('button');
   menuBtn.type = 'button';
   menuBtn.className = 'bookmark-menu-btn';
   menuBtn.title = 'Options';
-  menuBtn.innerHTML = getIconSvg('dotsThreeVertical', { size: 14 });
-  menuBtn.onclick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    showBookmarkContextMenu(e, bookmark);
-  };
+  menuBtn.dataset.menu = 'true';
+  menuBtn.appendChild(getIconNode('dotsThreeVertical', 14));
   a.appendChild(menuBtn);
-
-  // Track visit on link click
-  a.onclick = () => {
-    Storage.addVisit(bookmark.url, bookmark.title);
-  };
-
-  // Context menu on right-click
-  a.oncontextmenu = (e) => {
-    e.preventDefault();
-    showBookmarkContextMenu(e, bookmark);
-  };
 
   return a;
 }
 
 // ── Context Menu ───────────────────────────────────────────────
-function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
-  const existing = document.querySelector('.bookmark-context-menu');
-  if (existing) existing.remove();
+let activeMenuCleanup: (() => void) | null = null;
+
+function closeContextMenu() {
+  if (activeMenuCleanup) {
+    activeMenuCleanup();
+    activeMenuCleanup = null;
+  }
+}
+
+function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark, triggerEl?: HTMLElement) {
+  closeContextMenu();
 
   const isStarred = Storage.isStarred(bookmark.id);
   const menu = document.createElement('div');
   menu.className = 'bookmark-context-menu';
 
-  // Star / Unstar
   const starItem = document.createElement('button');
   starItem.type = 'button';
   starItem.className = 'context-menu-item';
@@ -194,12 +188,11 @@ function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
   starItem.onclick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    closeContextMenu();
     await Storage.toggleStar(bookmark.id);
     renderBookmarks();
-    menu.remove();
   };
 
-  // Remove
   const deleteItem = document.createElement('button');
   deleteItem.type = 'button';
   deleteItem.className = 'context-menu-item danger';
@@ -207,23 +200,24 @@ function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
   deleteItem.onclick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    closeContextMenu();
     if (confirm(`Delete bookmark "${bookmark.title}"?`)) {
       await Bookmarks.delete(bookmark.id);
       renderBookmarks();
       refreshSettingsLists();
       showNotification('Bookmark removed');
     }
-    menu.remove();
   };
 
   menu.appendChild(starItem);
   menu.appendChild(deleteItem);
 
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const target = (triggerEl || (event.currentTarget as HTMLElement) || document.body);
+  const rect = target.getBoundingClientRect();
   const menuWidth = 140;
   const menuHeight = 78;
 
-  let left = Math.min(window.innerWidth - menuWidth - 12, Math.max(12, rect.right - menuWidth));
+  const left = Math.min(window.innerWidth - menuWidth - 12, Math.max(12, rect.right - menuWidth));
   let top = rect.bottom + 4;
   if (top + menuHeight > window.innerHeight - 8) {
     top = Math.max(8, rect.top - menuHeight - 4);
@@ -231,8 +225,17 @@ function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
 
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
-
   document.body.appendChild(menu);
+
+  const handleOutsideClick = (e: MouseEvent) => {
+    if (!menu.contains(e.target as Node)) {
+      closeContextMenu();
+    }
+  };
+
+  const handleScroll = () => {
+    closeContextMenu();
+  };
 
   const cleanup = () => {
     menu.remove();
@@ -241,20 +244,14 @@ function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
     window.removeEventListener('resize', handleScroll);
   };
 
-  const handleOutsideClick = (e: MouseEvent) => {
-    if (!menu.contains(e.target as Node) && e.target !== event.currentTarget) {
-      cleanup();
-    }
-  };
-
-  const handleScroll = () => {
-    cleanup();
-  };
+  activeMenuCleanup = cleanup;
 
   setTimeout(() => {
-    document.addEventListener('click', handleOutsideClick);
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
+    if (activeMenuCleanup === cleanup) {
+      document.addEventListener('click', handleOutsideClick);
+      window.addEventListener('scroll', handleScroll, true);
+      window.addEventListener('resize', handleScroll);
+    }
   }, 0);
 }
 
@@ -262,35 +259,63 @@ function showBookmarkContextMenu(event: MouseEvent, bookmark: Bookmark) {
 function renderBookmarks() {
   const container = $('bookmarksList');
   const emptyState = $('emptyState');
-  container.innerHTML = '';
 
   const bookmarks = Bookmarks.getByTag(currentFilter);
+  bookmarkMap.clear();
+  for (const b of bookmarks) {
+    bookmarkMap.set(b.id, b);
+  }
 
   if (!bookmarks.length) {
     container.style.display = 'none';
     emptyState.style.display = 'flex';
+    container.replaceChildren();
     return;
   }
 
   container.style.display = 'block';
   emptyState.style.display = 'none';
 
-  // Single tag view: straightforward grid
+  const showFavicons = !!Storage.getCustomize().showFavicons;
+  const starredSet = new Set(Storage.getStarred());
+
+  // Single tag view
   if (currentFilter !== 'All') {
     const grid = document.createElement('div');
     grid.className = 'bookmarks-grid';
-    bookmarks.forEach((b) => grid.appendChild(createBookmarkElement(b)));
-    container.appendChild(grid);
+    const frag = document.createDocumentFragment();
+    for (const b of bookmarks) {
+      frag.appendChild(createBookmarkElement(b, false, showFavicons, starredSet.has(b.id)));
+    }
+    grid.appendChild(frag);
+    container.replaceChildren(grid);
     return;
   }
 
   // Masonry layout for "All" view
-  renderMasonryView(container, bookmarks);
+  renderMasonryView(container, bookmarks, showFavicons, starredSet);
 }
 
-function renderMasonryView(container: HTMLElement, bookmarks: Bookmark[]) {
-  const numColumns = getResponsiveColumnCount();
+function getShortestColumnIndex(heights: number[]): number {
+  let minIdx = 0;
+  let minVal = heights[0] ?? 0;
+  for (let i = 1; i < heights.length; i++) {
+    const h = heights[i] ?? 0;
+    if (h < minVal) {
+      minVal = h;
+      minIdx = i;
+    }
+  }
+  return minIdx;
+}
 
+function renderMasonryView(
+  container: HTMLElement,
+  bookmarks: Bookmark[],
+  showFavicons: boolean,
+  starredSet: Set<number>
+) {
+  const numColumns = getResponsiveColumnCount();
   const masonry = document.createElement('div');
   masonry.className = 'masonry-container';
 
@@ -302,7 +327,6 @@ function renderMasonryView(container: HTMLElement, bookmarks: Bookmark[]) {
   const columns: Section[][] = Array.from({ length: numColumns }, () => []);
   const columnHeights = new Array(numColumns).fill(0);
 
-  const starred = Storage.getStarred();
   const recent = Storage.getRecent();
 
   // 1. RECENT section
@@ -313,76 +337,90 @@ function renderMasonryView(container: HTMLElement, bookmarks: Bookmark[]) {
   }
 
   // 2. STARRED section
-  const starredBookmarks = bookmarks.filter((b) => starred.includes(b.id));
+  const starredBookmarks: Bookmark[] = [];
+  for (const b of bookmarks) {
+    if (starredSet.has(b.id)) {
+      starredBookmarks.push(b);
+    }
+  }
+
   if (starredBookmarks.length > 0) {
     const height = 28 + starredBookmarks.length * 20;
-    const targetCol = columnHeights.indexOf(Math.min(...columnHeights));
-    if (columns[targetCol]) {
-      columns[targetCol].push({ type: 'starred', items: starredBookmarks });
-      columnHeights[targetCol] += height;
+    const targetCol = getShortestColumnIndex(columnHeights);
+    const col = columns[targetCol];
+    if (col) {
+      col.push({ type: 'starred', items: starredBookmarks });
+      columnHeights[targetCol] = (columnHeights[targetCol] ?? 0) + height;
     }
   }
 
   // 3. Tag groups for remaining bookmarks
   const tagOrder = Bookmarks.getTags();
   const byTag: Record<string, Bookmark[]> = {};
-  const seen = new Set<string>();
 
-  bookmarks.forEach((b) => {
-    if (starred.includes(b.id)) return;
+  for (const b of bookmarks) {
+    if (starredSet.has(b.id)) continue;
     const tags = b.tags && b.tags.length ? b.tags : (b.group ? [`group:${b.group}`] : ['_none']);
-    tags.forEach((t) => {
-      if (!byTag[t]) byTag[t] = [];
-      const key = `${b.id}-${t}`;
-      if (!seen.has(key)) {
-        byTag[t].push(b);
-        seen.add(key);
+    for (const t of tags) {
+      let arr = byTag[t];
+      if (!arr) {
+        arr = [];
+        byTag[t] = arr;
       }
-    });
-  });
+      arr.push(b);
+    }
+  }
 
-  const orderedTags = tagOrder.filter((t) => byTag[t] && byTag[t].length);
-  Object.keys(byTag).forEach((t) => {
-    if (t !== '_none' && !orderedTags.includes(t)) {
+  const orderedTags: string[] = [];
+  const tagSet = new Set(tagOrder);
+
+  for (const t of tagOrder) {
+    if (byTag[t]?.length) orderedTags.push(t);
+  }
+  for (const t in byTag) {
+    if (t !== '_none' && !tagSet.has(t) && byTag[t]?.length) {
       orderedTags.push(t);
     }
-  });
-  if (byTag['_none'] && byTag['_none'].length) orderedTags.push('_none');
+  }
+  if (byTag['_none']?.length) orderedTags.push('_none');
 
-  orderedTags.forEach((tag) => {
+  for (const tag of orderedTags) {
     const items = byTag[tag];
-    if (!items || !items.length) return;
+    if (!items || !items.length) continue;
 
     const groupHeight = 28 + items.length * 20;
-    const shortestIdx = columnHeights.indexOf(Math.min(...columnHeights));
-    if (columns[shortestIdx]) {
-      columns[shortestIdx].push({ type: 'tag', tag, items });
-      columnHeights[shortestIdx] += groupHeight;
+    const shortestIdx = getShortestColumnIndex(columnHeights);
+    const col = columns[shortestIdx];
+    if (col) {
+      col.push({ type: 'tag', tag, items });
+      columnHeights[shortestIdx] = (columnHeights[shortestIdx] ?? 0) + groupHeight;
     }
-  });
+  }
 
-  // Render columns into DOM
-  columns.forEach((colSections) => {
+  // Render columns into DOM fragment
+  const frag = document.createDocumentFragment();
+  for (const colSections of columns) {
     const colEl = document.createElement('div');
     colEl.className = 'masonry-column';
 
-    colSections.forEach((section) => {
+    for (const section of colSections) {
       if (section.type === 'recent') {
-        colEl.appendChild(createRecentSection(section.items));
+        colEl.appendChild(createRecentSection(section.items, showFavicons));
       } else if (section.type === 'starred') {
-        colEl.appendChild(createStarredSection(section.items));
+        colEl.appendChild(createStarredSection(section.items, showFavicons));
       } else if (section.type === 'tag') {
-        colEl.appendChild(createTagSection(section.tag, section.items));
+        colEl.appendChild(createTagSection(section.tag, section.items, showFavicons, starredSet));
       }
-    });
+    }
 
-    masonry.appendChild(colEl);
-  });
+    frag.appendChild(colEl);
+  }
 
-  container.appendChild(masonry);
+  masonry.appendChild(frag);
+  container.replaceChildren(masonry);
 }
 
-function createRecentSection(items: RecentVisit[]): HTMLElement {
+function createRecentSection(items: RecentVisit[], showFavicons: boolean): HTMLElement {
   const section = document.createElement('div');
   section.className = 'group-section';
 
@@ -390,60 +428,53 @@ function createRecentSection(items: RecentVisit[]): HTMLElement {
   header.className = 'group-header';
   header.innerHTML = `
     <span class="group-name">${getIconSvg('arrowCounterClockwise', { size: 11 })} Recent</span>
-    <button class="clear-text-btn" title="Clear recent visits">
+    <button class="clear-text-btn" data-action="clear-recent" title="Clear recent visits">
       ${getIconSvg('trash', { size: 10 })} Clear
     </button>
   `;
-
-  header.querySelector('.clear-text-btn')?.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    await Storage.clearRecent();
-    renderBookmarks();
-  });
-
   section.appendChild(header);
 
   const list = document.createElement('div');
   list.className = 'bookmark-list';
+  const frag = document.createDocumentFragment();
 
-  items.forEach((item) => {
+  for (const item of items) {
     const a = document.createElement('a');
     a.href = item.url;
     a.className = 'bookmark';
-    a.title = `${item.title} — ${item.url}`;
+    a.title = `${item.title} \u2014 ${item.url}`;
+    a.dataset.url = item.url;
+    a.dataset.title = item.title;
 
-    let hostname = '';
-    try {
-      hostname = new URL(item.url).hostname;
-    } catch {
-      // ignore
-    }
-
-    const favicon = document.createElement('img');
-    favicon.className = 'bookmark-favicon';
-    favicon.alt = '';
-    favicon.loading = 'lazy';
-    if (hostname) {
-      favicon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`;
-      favicon.onerror = () => {
-        favicon.style.display = 'none';
-      };
+    if (showFavicons) {
+      const hostname = getDomain(item.url);
+      if (hostname) {
+        const favicon = document.createElement('img');
+        favicon.className = 'bookmark-favicon';
+        favicon.alt = '';
+        favicon.loading = 'lazy';
+        favicon.decoding = 'async';
+        favicon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`;
+        favicon.onerror = () => {
+          favicon.style.display = 'none';
+        };
+        a.appendChild(favicon);
+      }
     }
 
     const label = document.createElement('span');
     label.className = 'bookmark-label';
     label.textContent = item.title;
-
-    a.appendChild(favicon);
     a.appendChild(label);
-    list.appendChild(a);
-  });
+    frag.appendChild(a);
+  }
 
+  list.appendChild(frag);
   section.appendChild(list);
   return section;
 }
 
-function createStarredSection(items: Bookmark[]): HTMLElement {
+function createStarredSection(items: Bookmark[], showFavicons: boolean): HTMLElement {
   const section = document.createElement('div');
   section.className = 'group-section';
 
@@ -458,13 +489,22 @@ function createStarredSection(items: Bookmark[]): HTMLElement {
 
   const list = document.createElement('div');
   list.className = 'bookmark-list';
-  items.forEach((b) => list.appendChild(createBookmarkElement(b, true)));
+  const frag = document.createDocumentFragment();
+  for (const b of items) {
+    frag.appendChild(createBookmarkElement(b, true, showFavicons, true));
+  }
+  list.appendChild(frag);
   section.appendChild(list);
 
   return section;
 }
 
-function createTagSection(tag: string, items: Bookmark[]): HTMLElement {
+function createTagSection(
+  tag: string,
+  items: Bookmark[],
+  showFavicons: boolean,
+  starredSet: Set<number>
+): HTMLElement {
   const section = document.createElement('div');
   section.className = 'group-section';
 
@@ -490,7 +530,11 @@ function createTagSection(tag: string, items: Bookmark[]): HTMLElement {
 
   const list = document.createElement('div');
   list.className = 'bookmark-list';
-  items.forEach((b) => list.appendChild(createBookmarkElement(b)));
+  const frag = document.createDocumentFragment();
+  for (const b of items) {
+    frag.appendChild(createBookmarkElement(b, false, showFavicons, starredSet.has(b.id)));
+  }
+  list.appendChild(frag);
   section.appendChild(list);
 
   return section;
@@ -498,7 +542,7 @@ function createTagSection(tag: string, items: Bookmark[]): HTMLElement {
 
 // ── Modals: Add Bookmark ───────────────────────────────────────
 function openAddModal() {
-  selectedTags = [];
+  selectedTags.clear();
   selectedGroup = null;
 
   const urlInput = $<HTMLInputElement>('urlInput');
@@ -521,55 +565,48 @@ function closeAddModal() {
 
 function renderAddModalTags() {
   const container = $('tagList');
-  container.innerHTML = '';
+  const tags = Bookmarks.getTags();
+  const frag = document.createDocumentFragment();
 
-  Bookmarks.getTags().forEach((tag) => {
+  for (const tag of tags) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `tag-option ${selectedTags.includes(tag) ? 'selected' : ''}`;
+    btn.className = `tag-option${selectedTags.has(tag) ? ' selected' : ''}`;
     btn.textContent = tag;
-    btn.onclick = () => {
-      selectedTags = selectedTags.includes(tag)
-        ? selectedTags.filter((t) => t !== tag)
-        : [...selectedTags, tag];
-      renderAddModalTags();
-    };
-    container.appendChild(btn);
-  });
+    btn.dataset.tag = tag;
+    frag.appendChild(btn);
+  }
+  container.replaceChildren(frag);
 }
 
 function renderAddModalGroups() {
   const container = $('groupList');
-  container.innerHTML = '';
-
   const groups = Bookmarks.getGroups();
+
   if (!groups.length) {
     container.innerHTML =
       '<div style="opacity:0.4;font-size:10px;font-family:var(--font-mono);padding:4px 0;">No groups defined yet</div>';
     return;
   }
 
+  const frag = document.createDocumentFragment();
   const noneBtn = document.createElement('button');
   noneBtn.type = 'button';
-  noneBtn.className = `tag-option ${!selectedGroup ? 'selected' : ''}`;
+  noneBtn.className = `tag-option${!selectedGroup ? ' selected' : ''}`;
   noneBtn.textContent = 'None';
-  noneBtn.onclick = () => {
-    selectedGroup = null;
-    renderAddModalGroups();
-  };
-  container.appendChild(noneBtn);
+  noneBtn.dataset.group = '';
+  frag.appendChild(noneBtn);
 
-  groups.forEach((group) => {
+  for (const group of groups) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `tag-option ${selectedGroup === group.id ? 'selected' : ''}`;
+    btn.className = `tag-option${selectedGroup === group.id ? ' selected' : ''}`;
     btn.textContent = group.name;
-    btn.onclick = () => {
-      selectedGroup = group.id;
-      renderAddModalGroups();
-    };
-    container.appendChild(btn);
-  });
+    btn.dataset.group = group.id;
+    frag.appendChild(btn);
+  }
+
+  container.replaceChildren(frag);
 }
 
 async function saveBookmarkFromModal() {
@@ -600,7 +637,7 @@ async function saveBookmarkFromModal() {
     await Bookmarks.add({
       url,
       title,
-      tags: selectedTags,
+      tags: Array.from(selectedTags),
       group: selectedGroup,
     });
     closeAddModal();
@@ -615,7 +652,8 @@ async function saveBookmarkFromModal() {
 // ── Modals: Settings ───────────────────────────────────────────
 function openSettingsModal() {
   updateWallpaperPreview();
-  refreshSettingsLists();
+  renderSettingsBookmarks();
+  renderSettingsGroups();
   refreshCustomizePanel();
   $('settingsModal').classList.add('active');
 }
@@ -625,23 +663,23 @@ function closeSettingsModal() {
 }
 
 function refreshSettingsLists() {
+  if (!$('settingsModal').classList.contains('active')) return;
   renderSettingsBookmarks();
   renderSettingsGroups();
 }
 
 function renderSettingsBookmarks() {
   const container = $('settingsBookmarksList');
-  container.className = 'settings-bookmarks-list';
-  container.innerHTML = '';
-
   const bookmarks = Bookmarks.getAll();
+
   if (!bookmarks.length) {
     container.innerHTML =
       '<div style="opacity:0.4;text-align:center;padding:18px;font-size:10px;text-transform:uppercase;letter-spacing:1px;">No bookmarks saved</div>';
     return;
   }
 
-  bookmarks.forEach((b) => {
+  const frag = document.createDocumentFragment();
+  for (const b of bookmarks) {
     const row = document.createElement('div');
     row.className = 'bookmark-item';
 
@@ -656,35 +694,30 @@ function renderSettingsBookmarks() {
     delBtn.type = 'button';
     delBtn.className = 'delete-btn-sm';
     delBtn.title = 'Delete bookmark';
-    delBtn.innerHTML = getIconSvg('trash', { size: 12 });
-    delBtn.onclick = async () => {
-      if (confirm(`Delete bookmark "${b.title}"?`)) {
-        await Bookmarks.delete(b.id);
-        renderBookmarks();
-        refreshSettingsLists();
-        showNotification('Bookmark deleted');
-      }
-    };
+    delBtn.dataset.id = String(b.id);
+    delBtn.dataset.title = b.title;
+    delBtn.appendChild(getIconNode('trash', 12));
 
     row.appendChild(info);
     row.appendChild(delBtn);
-    container.appendChild(row);
-  });
+    frag.appendChild(row);
+  }
+
+  container.replaceChildren(frag);
 }
 
 function renderSettingsGroups() {
   const container = $('groupManager');
-  container.className = 'group-manager';
-  container.innerHTML = '';
-
   const groups = Bookmarks.getGroups();
+
   if (!groups.length) {
     container.innerHTML =
       '<div style="opacity:0.4;font-size:10px;padding:8px 0;text-transform:uppercase;">No groups created yet</div>';
     return;
   }
 
-  groups.forEach((g) => {
+  const frag = document.createDocumentFragment();
+  for (const g of groups) {
     const row = document.createElement('div');
     row.className = 'group-row';
 
@@ -696,20 +729,16 @@ function renderSettingsGroups() {
     delBtn.type = 'button';
     delBtn.className = 'delete-btn-sm';
     delBtn.title = 'Delete group';
-    delBtn.innerHTML = getIconSvg('trash', { size: 12 });
-    delBtn.onclick = async () => {
-      if (confirm(`Delete group "${g.name}"? Bookmarks will become ungrouped.`)) {
-        await Bookmarks.deleteGroup(g.id);
-        renderBookmarks();
-        refreshSettingsLists();
-        showNotification('Group deleted');
-      }
-    };
+    delBtn.dataset.id = g.id;
+    delBtn.dataset.name = g.name;
+    delBtn.appendChild(getIconNode('trash', 12));
 
     row.appendChild(name);
     row.appendChild(delBtn);
-    container.appendChild(row);
-  });
+    frag.appendChild(row);
+  }
+
+  container.replaceChildren(frag);
 }
 
 async function addGroup() {
@@ -787,79 +816,67 @@ async function resetWallpaper() {
 function refreshCustomizePanel() {
   const c = Storage.getCustomize();
 
-  // Font size
   $<HTMLInputElement>('custFontSize').value = String(c.fontSize);
   $('custFontSizeVal').textContent = `${c.fontSize}px`;
 
-  // Font color
   if (c.fontColor.startsWith('#')) {
     $<HTMLInputElement>('custFontColor').value = c.fontColor;
   }
   updateSwatchActive(c.fontColor);
 
-  // Font weight
   setToggleActive('custFontWeight', c.fontWeight);
-
-  // Text transform
   setToggleActive('custTextTransform', c.textTransform || 'uppercase');
 
-  // Letter spacing
   $<HTMLInputElement>('custSpacing').value = String(c.letterSpacing);
   $('custSpacingVal').textContent = `${Number(c.letterSpacing).toFixed(1)}px`;
 
-  // Layout columns
   setToggleActive('custColumns', String(c.columnCount));
-
-  // Compact mode
   setToggleActive('custCompact', String(c.compactMode));
-
-  // Favicons
   setToggleActive('custFavicons', String(!!c.showFavicons));
 
-  // Custom tags pills
   renderCustTagPills();
 }
 
 function setToggleActive(groupId: string, val: string) {
   const group = $(groupId);
-  group.querySelectorAll<HTMLButtonElement>('.cust-toggle-btn').forEach((btn) => {
+  const btns = group.querySelectorAll<HTMLButtonElement>('.cust-toggle-btn');
+  for (const btn of btns) {
     btn.classList.toggle('active', btn.dataset.val === val);
-  });
+  }
 }
 
 function updateSwatchActive(color: string) {
-  document.querySelectorAll<HTMLButtonElement>('.cust-swatch').forEach((sw) => {
+  const swatches = document.querySelectorAll<HTMLButtonElement>('.cust-swatch');
+  for (const sw of swatches) {
     sw.classList.toggle('active', sw.dataset.color === color);
-  });
+  }
 }
 
 function renderCustTagPills() {
   const container = $('custTagPills');
-  container.innerHTML = '';
+  const tags = Storage.getTags();
+  const frag = document.createDocumentFragment();
 
-  Storage.getTags().forEach((tag) => {
+  for (const tag of tags) {
     const pill = document.createElement('span');
     pill.className = 'cust-tag-pill';
-    pill.innerHTML = `
-      <span>${tag}</span>
-      <button type="button" class="cust-tag-pill-del" title="Remove tag">
-        ${getIconSvg('x', { size: 10 })}
-      </button>
-    `;
 
-    pill.querySelector('.cust-tag-pill-del')?.addEventListener('click', async () => {
-      await Storage.deleteTag(tag);
-      if (currentFilter === tag) {
-        currentFilter = 'All';
-      }
-      renderFilters();
-      renderBookmarks();
-      renderCustTagPills();
-      showNotification(`Tag "${tag}" removed`);
-    });
+    const span = document.createElement('span');
+    span.textContent = tag;
 
-    container.appendChild(pill);
-  });
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'cust-tag-pill-del';
+    delBtn.title = 'Remove tag';
+    delBtn.dataset.tag = tag;
+    delBtn.appendChild(getIconNode('x', 10));
+
+    pill.appendChild(span);
+    pill.appendChild(delBtn);
+    frag.appendChild(pill);
+  }
+
+  container.replaceChildren(frag);
 }
 
 async function addCustomTag() {
@@ -936,7 +953,7 @@ async function clearAllData() {
   }
   await Storage.clearAll();
   currentFilter = 'All';
-  selectedTags = [];
+  selectedTags.clear();
   selectedGroup = null;
   renderFilters();
   renderBookmarks();
@@ -963,177 +980,346 @@ function clearError(elementId: string) {
 
 // ── Wire Event Listeners ───────────────────────────────────────
 function wireEventListeners() {
-  // Add modal trigger
-  $('addBtn').onclick = openAddModal;
-  $('addBookmarkBtn').onclick = openAddModal;
-  $('closeAddModal').onclick = closeAddModal;
-  $('cancelAddBtn').onclick = closeAddModal;
-  $('saveBookmarkBtn').onclick = saveBookmarkFromModal;
-  $('addModal').onclick = (e) => {
-    if (e.target === $('addModal')) closeAddModal();
-  };
+  // Filters bar delegation
+  $('filters').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.filter-pill');
+    if (btn?.dataset.tag) {
+      const tag = btn.dataset.tag;
+      if (currentFilter !== tag) {
+        currentFilter = tag;
+        renderFilters();
+        renderBookmarks();
+      }
+    }
+  });
 
-  $<HTMLInputElement>('urlInput').onkeydown = (e) => {
+  // Bookmarks list event delegation
+  const bookmarksList = $('bookmarksList');
+
+  bookmarksList.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+
+    // Check menu button click
+    const menuBtn = target.closest<HTMLButtonElement>('.bookmark-menu-btn');
+    if (menuBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const bookmarkEl = menuBtn.closest<HTMLAnchorElement>('.bookmark');
+      if (bookmarkEl?.dataset.id) {
+        const bId = Number(bookmarkEl.dataset.id);
+        const b = bookmarkMap.get(bId);
+        if (b) showBookmarkContextMenu(e, b, menuBtn);
+      }
+      return;
+    }
+
+    // Check clear recent button
+    const clearRecentBtn = target.closest<HTMLButtonElement>('[data-action="clear-recent"]');
+    if (clearRecentBtn) {
+      e.stopPropagation();
+      Storage.clearRecent().then(() => renderBookmarks());
+      return;
+    }
+
+    // Check link click to track recent visit
+    const bookmarkEl = target.closest<HTMLAnchorElement>('.bookmark');
+    if (bookmarkEl?.dataset.url) {
+      Storage.addVisit(bookmarkEl.dataset.url, bookmarkEl.dataset.title || '');
+    }
+  });
+
+  bookmarksList.addEventListener('contextmenu', (e) => {
+    const target = e.target as HTMLElement;
+    const bookmarkEl = target.closest<HTMLAnchorElement>('.bookmark');
+    if (bookmarkEl?.dataset.id) {
+      e.preventDefault();
+      const bId = Number(bookmarkEl.dataset.id);
+      const b = bookmarkMap.get(bId);
+      if (b) showBookmarkContextMenu(e, b, bookmarkEl);
+    }
+  });
+
+  // Add modal trigger
+  $('addBtn').addEventListener('click', openAddModal);
+  $('addBookmarkBtn').addEventListener('click', openAddModal);
+  $('closeAddModal').addEventListener('click', closeAddModal);
+  $('cancelAddBtn').addEventListener('click', closeAddModal);
+  $('saveBookmarkBtn').addEventListener('click', saveBookmarkFromModal);
+  $('addModal').addEventListener('click', (e) => {
+    if (e.target === $('addModal')) closeAddModal();
+  });
+
+  $<HTMLInputElement>('urlInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') saveBookmarkFromModal();
-  };
-  $<HTMLInputElement>('titleInput').onkeydown = (e) => {
+  });
+  $<HTMLInputElement>('titleInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') saveBookmarkFromModal();
-  };
+  });
+
+  // Add modal tag / group delegation
+  $('tagList').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.tag-option');
+    if (btn?.dataset.tag) {
+      const tag = btn.dataset.tag;
+      if (selectedTags.has(tag)) {
+        selectedTags.delete(tag);
+        btn.classList.remove('selected');
+      } else {
+        selectedTags.add(tag);
+        btn.classList.add('selected');
+      }
+    }
+  });
+
+  $('groupList').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.tag-option');
+    if (btn && btn.dataset.group !== undefined) {
+      selectedGroup = btn.dataset.group || null;
+      const allBtns = $('groupList').querySelectorAll<HTMLButtonElement>('.tag-option');
+      for (const b of allBtns) {
+        b.classList.toggle('selected', b === btn);
+      }
+    }
+  });
 
   // Settings modal trigger
-  $('settingsBtn').onclick = openSettingsModal;
-  $('closeSettingsModal').onclick = closeSettingsModal;
-  $('closeSettingsBtn').onclick = closeSettingsModal;
-  $('settingsModal').onclick = (e) => {
+  $('settingsBtn').addEventListener('click', openSettingsModal);
+  $('closeSettingsModal').addEventListener('click', closeSettingsModal);
+  $('closeSettingsBtn').addEventListener('click', closeSettingsModal);
+  $('settingsModal').addEventListener('click', (e) => {
     if (e.target === $('settingsModal')) closeSettingsModal();
-  };
+  });
+
+  // Settings bookmarks list delegation
+  $('settingsBookmarksList').addEventListener('click', async (e) => {
+    const delBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('.delete-btn-sm');
+    if (delBtn?.dataset.id) {
+      const id = Number(delBtn.dataset.id);
+      const title = delBtn.dataset.title || 'bookmark';
+      if (confirm(`Delete bookmark "${title}"?`)) {
+        await Bookmarks.delete(id);
+        renderBookmarks();
+        renderSettingsBookmarks();
+        showNotification('Bookmark deleted');
+      }
+    }
+  });
+
+  // Settings group manager delegation
+  $('groupManager').addEventListener('click', async (e) => {
+    const delBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('.delete-btn-sm');
+    if (delBtn?.dataset.id) {
+      const id = delBtn.dataset.id;
+      const name = delBtn.dataset.name || 'group';
+      if (confirm(`Delete group "${name}"? Bookmarks will become ungrouped.`)) {
+        await Bookmarks.deleteGroup(id);
+        renderBookmarks();
+        renderSettingsGroups();
+        showNotification('Group deleted');
+      }
+    }
+  });
 
   // Wallpaper settings
-  $('applyWallpaperBtn').onclick = applyWallpaperUrl;
-  $<HTMLInputElement>('wallpaperInput').onkeydown = (e) => {
+  $('applyWallpaperBtn').addEventListener('click', applyWallpaperUrl);
+  $<HTMLInputElement>('wallpaperInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') applyWallpaperUrl();
-  };
-  $<HTMLInputElement>('wallpaperUpload').onchange = (e) => {
+  });
+  $<HTMLInputElement>('wallpaperUpload').addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     applyWallpaperFile(file);
-  };
-  $('resetWallpaperBtn').onclick = resetWallpaper;
+  });
+  $('resetWallpaperBtn').addEventListener('click', resetWallpaper);
 
   // Groups
-  $('addGroupBtn').onclick = addGroup;
-  $<HTMLInputElement>('newGroupInput').onkeydown = (e) => {
+  $('addGroupBtn').addEventListener('click', addGroup);
+  $<HTMLInputElement>('newGroupInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addGroup();
-  };
+  });
 
-  // Customize: typography
-  $<HTMLInputElement>('custFontSize').oninput = (e) => {
+  // Customize: typography with instant GPU CSS property updates + debounced storage
+  $<HTMLInputElement>('custFontSize').addEventListener('input', (e) => {
     const val = Number((e.target as HTMLInputElement).value);
     $('custFontSizeVal').textContent = `${val}px`;
-    saveCustomizePatch({ fontSize: val });
-  };
+    document.documentElement.style.setProperty('--bookmark-font-size', `${val}px`);
+    debouncedSaveCustomize({ fontSize: val });
+  }, { passive: true });
 
-  $<HTMLInputElement>('custFontColor').oninput = (e) => {
+  $<HTMLInputElement>('custFontColor').addEventListener('input', (e) => {
     const val = (e.target as HTMLInputElement).value;
     updateSwatchActive(val);
-    saveCustomizePatch({ fontColor: val });
-  };
+    document.documentElement.style.setProperty('--bookmark-color', val);
+    debouncedSaveCustomize({ fontColor: val });
+  }, { passive: true });
 
-  document.querySelectorAll<HTMLButtonElement>('.cust-swatch').forEach((sw) => {
-    sw.onclick = () => {
-      const color = sw.dataset.color || '#ffffff';
+  document.querySelector('.cust-color-row')?.addEventListener('click', (e) => {
+    const sw = (e.target as HTMLElement).closest<HTMLButtonElement>('.cust-swatch');
+    if (sw?.dataset.color) {
+      const color = sw.dataset.color;
       if (color.startsWith('#')) {
         $<HTMLInputElement>('custFontColor').value = color;
       }
       updateSwatchActive(color);
-      saveCustomizePatch({ fontColor: color });
-    };
+      document.documentElement.style.setProperty('--bookmark-color', color);
+      Storage.saveCustomize({ fontColor: color });
+    }
   });
 
-  $('custFontWeight').querySelectorAll<HTMLButtonElement>('.cust-toggle-btn').forEach((btn) => {
-    btn.onclick = () => {
-      const val = (btn.dataset.val || 'bold') as 'normal' | 'bold';
+  $('custFontWeight').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.cust-toggle-btn');
+    if (btn?.dataset.val) {
+      const val = btn.dataset.val as 'normal' | 'bold';
       setToggleActive('custFontWeight', val);
-      saveCustomizePatch({ fontWeight: val });
-    };
+      document.documentElement.style.setProperty('--bookmark-weight', val);
+      Storage.saveCustomize({ fontWeight: val });
+    }
   });
 
-  $('custTextTransform').querySelectorAll<HTMLButtonElement>('.cust-toggle-btn').forEach((btn) => {
-    btn.onclick = () => {
-      const val = (btn.dataset.val || 'uppercase') as 'uppercase' | 'lowercase' | 'none';
+  $('custTextTransform').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.cust-toggle-btn');
+    if (btn?.dataset.val) {
+      const val = btn.dataset.val as 'uppercase' | 'lowercase' | 'none';
       setToggleActive('custTextTransform', val);
-      saveCustomizePatch({ textTransform: val });
-    };
+      document.documentElement.style.setProperty('--bookmark-transform', val);
+      Storage.saveCustomize({ textTransform: val });
+    }
   });
 
-  $<HTMLInputElement>('custSpacing').oninput = (e) => {
+  $<HTMLInputElement>('custSpacing').addEventListener('input', (e) => {
     const val = parseFloat((e.target as HTMLInputElement).value);
     $('custSpacingVal').textContent = `${val.toFixed(1)}px`;
-    saveCustomizePatch({ letterSpacing: val });
-  };
+    document.documentElement.style.setProperty('--bookmark-spacing', `${val}px`);
+    debouncedSaveCustomize({ letterSpacing: val });
+  }, { passive: true });
 
-  // Customize: custom tag addition
-  $('custAddTagBtn').onclick = addCustomTag;
-  $<HTMLInputElement>('custNewTagInput').onkeydown = (e) => {
+  // Custom tags pills delegation
+  $('custTagPills').addEventListener('click', async (e) => {
+    const delBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('.cust-tag-pill-del');
+    if (delBtn?.dataset.tag) {
+      const tag = delBtn.dataset.tag;
+      await Storage.deleteTag(tag);
+      if (currentFilter === tag) {
+        currentFilter = 'All';
+      }
+      renderFilters();
+      renderBookmarks();
+      renderCustTagPills();
+      showNotification(`Tag "${tag}" removed`);
+    }
+  });
+
+  $('custAddTagBtn').addEventListener('click', addCustomTag);
+  $<HTMLInputElement>('custNewTagInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addCustomTag();
-  };
+  });
 
   // Customize: layout columns
-  $('custColumns').querySelectorAll<HTMLButtonElement>('.cust-toggle-btn').forEach((btn) => {
-    btn.onclick = () => {
-      const val = Number(btn.dataset.val || 4);
+  $('custColumns').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.cust-toggle-btn');
+    if (btn?.dataset.val) {
+      const val = Number(btn.dataset.val);
       setToggleActive('custColumns', String(val));
-      saveCustomizePatch({ columnCount: val });
-      renderBookmarks();
-    };
+      Storage.saveCustomize({ columnCount: val }).then(() => {
+        applyCustomize();
+        renderBookmarks();
+      });
+    }
   });
 
   // Customize: compact mode
-  $('custCompact').querySelectorAll<HTMLButtonElement>('.cust-toggle-btn').forEach((btn) => {
-    btn.onclick = () => {
+  $('custCompact').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.cust-toggle-btn');
+    if (btn?.dataset.val) {
       const val = btn.dataset.val === 'true';
       setToggleActive('custCompact', String(val));
-      saveCustomizePatch({ compactMode: val });
-    };
+      document.documentElement.style.setProperty('--bookmark-padding', val ? '4px' : '7px');
+      Storage.saveCustomize({ compactMode: val });
+    }
   });
 
   // Customize: show favicons
-  $('custFavicons').querySelectorAll<HTMLButtonElement>('.cust-toggle-btn').forEach((btn) => {
-    btn.onclick = () => {
+  $('custFavicons').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.cust-toggle-btn');
+    if (btn?.dataset.val) {
       const val = btn.dataset.val === 'true';
       setToggleActive('custFavicons', String(val));
-      saveCustomizePatch({ showFavicons: val });
-    };
+      document.documentElement.classList.toggle('show-favicons', val);
+      Storage.saveCustomize({ showFavicons: val }).then(() => {
+        renderBookmarks();
+      });
+    }
   });
 
   // Data management
-  $('exportBtn').onclick = exportData;
+  $('exportBtn').addEventListener('click', exportData);
   const importFile = $<HTMLInputElement>('importFile');
-  $('importBtn').onclick = () => importFile.click();
-  importFile.onchange = (e) => {
+  $('importBtn').addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     handleImport(file);
-  };
-  $('clearBtn').onclick = clearAllData;
+  });
+  $('clearBtn').addEventListener('click', clearAllData);
 
   // Global keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeAddModal();
       closeSettingsModal();
-      document.querySelector('.bookmark-context-menu')?.remove();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      closeContextMenu();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
       const addModal = $('addModal');
       addModal.classList.contains('active') ? closeAddModal() : openAddModal();
     }
   });
 
-  // Responsive window resize listener
+  // Responsive window resize listener with column check
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastCols = getResponsiveColumnCount();
+
   window.addEventListener('resize', () => {
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      applyCustomize();
-      renderBookmarks();
-    }, 120);
-  });
+      const newCols = getResponsiveColumnCount();
+      if (newCols !== lastCols) {
+        lastCols = newCols;
+        applyCustomize();
+        renderBookmarks();
+      }
+    }, 100);
+  }, { passive: true });
 }
 
 // ── Main App Initialization ────────────────────────────────────
 async function init() {
   await Storage.init();
 
-  // Reactive listener: whenever data changes in storage (e.g. from popup or other tab),
-  // re-render UI automatically in real-time!
-  Storage.onChange(() => {
-    renderFilters();
-    renderBookmarks();
-    applyCustomize();
-    Wallpaper.apply($('wallpaperContainer'));
+  // Selective reactive listener: only re-render the components that actually changed!
+  Storage.onChange((keys: ReadonlySet<StorageChangeKey>) => {
+    if (keys.has('tags')) {
+      renderFilters();
+      if ($('settingsModal').classList.contains('active')) {
+        renderCustTagPills();
+      }
+    }
+    if (
+      keys.has('bookmarks') ||
+      keys.has('starred') ||
+      keys.has('recent') ||
+      keys.has('groups') ||
+      keys.has('tags')
+    ) {
+      renderBookmarks();
+      refreshSettingsLists();
+    }
+    if (keys.has('customize')) {
+      applyCustomize();
+    }
+    if (keys.has('wallpaper')) {
+      Wallpaper.apply($('wallpaperContainer'));
+    }
   });
 
-  setupStaticIcons();
   applyCustomize();
   Wallpaper.apply($('wallpaperContainer'));
   renderFilters();

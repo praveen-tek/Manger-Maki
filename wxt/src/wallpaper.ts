@@ -1,5 +1,7 @@
 import { Storage, DEFAULT_WALLPAPER } from './storage';
 
+let lastAppliedKey = '';
+
 export const Wallpaper = {
   isVideo(url: string): boolean {
     if (!url) return false;
@@ -8,8 +10,24 @@ export const Wallpaper = {
 
   apply(container: HTMLElement): void {
     const wallpaper = Storage.getWallpaper();
+    const key = `${wallpaper.type}:${wallpaper.value}`;
+
+    // If already applied and media exists, skip expensive DOM reconstruction
+    if (key === lastAppliedKey && (wallpaper.type === 'gradient' || container.children.length > 0)) {
+      return;
+    }
+    lastAppliedKey = key;
+
+    // Clean up previous video/image elements
     const existingMedia = container.querySelectorAll('img, video');
-    existingMedia.forEach((el) => el.remove());
+    existingMedia.forEach((el) => {
+      if (el instanceof HTMLVideoElement) {
+        el.pause();
+        el.removeAttribute('src');
+        el.load();
+      }
+      el.remove();
+    });
 
     if (wallpaper.type === 'gradient') {
       container.style.background = wallpaper.value;
@@ -27,6 +45,7 @@ export const Wallpaper = {
         vid.onerror = () => {
           vid.remove();
           container.style.background = DEFAULT_WALLPAPER.value;
+          lastAppliedKey = `gradient:${DEFAULT_WALLPAPER.value}`;
         };
         container.appendChild(vid);
         container.style.background = 'transparent';
@@ -34,11 +53,13 @@ export const Wallpaper = {
         const img = document.createElement('img');
         img.src = wallpaper.value;
         img.alt = '';
+        img.decoding = 'async';
         img.style.cssText =
           'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;';
         img.onerror = () => {
           img.remove();
           container.style.background = DEFAULT_WALLPAPER.value;
+          lastAppliedKey = `gradient:${DEFAULT_WALLPAPER.value}`;
         };
         container.appendChild(img);
         container.style.background = 'transparent';

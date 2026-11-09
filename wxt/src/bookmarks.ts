@@ -9,7 +9,7 @@ export const Bookmarks = {
   getByTag(tag: string): Bookmark[] {
     const all = this.getAll();
     if (!tag || tag === 'All') return all;
-    return all.filter((b) => (b.tags || []).includes(tag));
+    return all.filter((b) => b.tags?.includes(tag));
   },
 
   getTags(): string[] {
@@ -57,14 +57,5 @@ export const Bookmarks = {
 
   async deleteGroup(id: string): Promise<boolean> {
     return Storage.deleteGroup(id);
-  },
-
-  getFaviconUrl(url: string): string | null {
-    try {
-      const hostname = new URL(url).hostname;
-      return `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
-    } catch {
-      return null;
-    }
   },
 };
